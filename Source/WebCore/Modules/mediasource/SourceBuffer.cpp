@@ -523,7 +523,7 @@ ExceptionOr<void> SourceBuffer::appendBufferInternal(const unsigned char* data, 
     evictCodedFrames(size);
 
     // FIXME: enable this code when MSE libraries have been updated to support it.
-#if USE(GSTREAMER)
+#if 0
     // 5. If the buffer full flag equals true, then throw a QUOTA_EXCEEDED_ERR exception and abort these step.
     if (m_bufferFull) {
         WTFLogAlways("WARNING: SourceBuffer::appendBufferInternal(%p) -  buffer full, failing with QUOTA_EXCEEDED_ERR error", this);
