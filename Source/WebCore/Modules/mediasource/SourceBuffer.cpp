@@ -65,9 +65,7 @@
 #undef LOG
 #define LOG(channel, msg, ...) do { printf("%s: ", #channel); printf(msg, ## __VA_ARGS__); printf("\n"); fflush(stdout); } while (false)
 
-#if !LOG_DISABLED
 #include <wtf/text/StringBuilder.h>
-#endif
 
 namespace WebCore {
 
@@ -475,6 +473,24 @@ MediaTime SourceBuffer::sourceBufferPrivateFastSeekTimeForMediaTime(SourceBuffer
 bool SourceBuffer::hasPendingActivity() const
 {
     return m_source || m_asyncEventQueue.hasPendingEvents();
+}
+
+String SourceBuffer::detailedBuffered()
+{
+    StringBuilder result;
+
+    for (auto& trackBufferPair : m_trackBufferMap) {
+        TrackBuffer& trackBuffer = trackBufferPair.value;
+        const AtomicString& trackID = trackBufferPair.key;
+        if (!result.isEmpty())
+            result.append(", ");
+        result.append(trackID.string());
+        result.append(": ");
+        StringPrintStream out;
+        trackBuffer.buffered.dump(out);
+        result.append(out.toString());
+    }
+    return result.toString();
 }
 
 void SourceBuffer::stop()
@@ -1908,6 +1924,7 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
 
     while (!trackBuffer.decodeQueue.empty()) {
         if (!m_private->isReadyForMoreSamples(trackID)) {
+            LOG(MediaSource, "SourceBuffer::provideMediaData(%p) - Break: Track %s isn't ready for more samples", this, trackID.string().utf8().data());
             m_private->notifyClientWhenReadyForMoreSamples(trackID);
             break;
         }
@@ -1926,8 +1943,11 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
         // new current time without triggering this early return.
         // FIXME(135867): Make this gap detection logic less arbitrary.
         MediaTime oneSecond(1, 1);
-        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond)
+        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond) {
+            LOG(MediaSource, "SourceBuffer::provideMediaData(%p) - Break: Sample (%s) >1 sec after lastEnqueuedDecodeEndTime (%s)",
+                this, toString(sample->decodeTime()).utf8().data(), toString(trackBuffer.lastEnqueuedDecodeEndTime).utf8().data());
             break;
+        }
 
         trackBuffer.lastEnqueuedPresentationTime = sample->presentationTime();
         trackBuffer.lastEnqueuedDecodeEndTime = sample->decodeTime() + sample->duration();
@@ -1942,7 +1962,10 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
 
 void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, AtomicString trackID, const MediaTime& time)
 {
+    LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p) - trackID: %s, time: %s", this, trackID.string().utf8().data(), toString(time).utf8().data());
     m_private->flush(trackID);
+
+    LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): Clearing decode queue", this);
     trackBuffer.decodeQueue.clear();
 
     // Find the sample which contains the current presentation time.
@@ -1952,8 +1975,10 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, AtomicString 
         currentSamplePTSIterator = trackBuffer.samples.presentationOrder().findSampleOnOrAfterPresentationTime(time);
 
     if (currentSamplePTSIterator == trackBuffer.samples.presentationOrder().end()
-        || (currentSamplePTSIterator->first - time) > currentTimeFudgeFactor())
+        || (currentSamplePTSIterator->first - time) > currentTimeFudgeFactor()) {
+        LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): Returning because the first sample is beyond the reenqueue time", this);
         return;
+    }
 
     // Seach backward for the previous sync sample.
     DecodeOrderSampleMap::KeyType decodeKey(currentSamplePTSIterator->second->decodeTime(), currentSamplePTSIterator->second->presentationTime());
@@ -1962,13 +1987,17 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, AtomicString 
 
     auto reverseCurrentSampleIter = --DecodeOrderSampleMap::reverse_iterator(currentSampleDTSIterator);
     auto reverseLastSyncSampleIter = trackBuffer.samples.decodeOrder().findSyncSamplePriorToDecodeIterator(reverseCurrentSampleIter);
-    if (reverseLastSyncSampleIter == trackBuffer.samples.decodeOrder().rend())
+    if (reverseLastSyncSampleIter == trackBuffer.samples.decodeOrder().rend()) {
+        LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): Returning because the last sync sample couldn't be found", this);
         return;
+    }
 
     // Fill the decode queue with the non-displaying samples.
     for (auto iter = reverseLastSyncSampleIter; iter != reverseCurrentSampleIter; --iter) {
         auto copy = iter->second->createNonDisplayingCopy();
         DecodeOrderSampleMap::KeyType decodeKey(copy->decodeTime(), copy->presentationTime());
+
+        LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): Adding non-displaying sample to decodeQueue: %s", this, toString(decodeKey.first).utf8().data());
         trackBuffer.decodeQueue.insert(DecodeOrderSampleMap::MapType::value_type(decodeKey, WTFMove(copy)));
     }
 
@@ -1976,20 +2005,35 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, AtomicString 
         auto& lastSample = trackBuffer.decodeQueue.rbegin()->second;
         trackBuffer.lastEnqueuedPresentationTime = lastSample->presentationTime();
         trackBuffer.lastEnqueuedDecodeEndTime = lastSample->decodeTime();
+
+        LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): Non-displaying samples: [%s, %s]",
+            this, toString(trackBuffer.decodeQueue.begin()->first.first).utf8().data(),
+            toString(trackBuffer.decodeQueue.rbegin()->first.first).utf8().data());
     } else {
         trackBuffer.lastEnqueuedPresentationTime = MediaTime::invalidTime();
         trackBuffer.lastEnqueuedDecodeEndTime = MediaTime::invalidTime();
     }
 
+    LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): lastDecodeTimestamp: %s, lastEnqueuedDecodeEndTime: %s, lastEnqueuedPresentationTime: %s",
+        this,
+        toString(trackBuffer.lastDecodeTimestamp).utf8().data(),
+        toString(trackBuffer.lastEnqueuedDecodeEndTime).utf8().data(),
+        toString(trackBuffer.lastEnqueuedPresentationTime).utf8().data());
+
     // Fill the decode queue with the remaining samples.
-    for (auto iter = currentSampleDTSIterator; iter != trackBuffer.samples.decodeOrder().end()
+    for (auto iter = currentSampleDTSIterator; iter != trackBuffer.samples.decodeOrder().end(); ++iter) {
 #if defined(METROLOGICAL)
         // Insert only the new buffered samples, don't insert the samples of the last buffered range.
-        // use case: backward seek to unbuffered range before a buffered one.
-        && iter->first.first <= trackBuffer.lastDecodeTimestamp
+        if (!(iter->first.first <= trackBuffer.lastDecodeTimestamp)) {
+            LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): Sample %s > lastDecodeTimestamp %s, skipping remaining samples for decodeQueue",
+                this, toString(iter->first.first).utf8().data(),
+                toString(trackBuffer.lastDecodeTimestamp).utf8().data());
+            break;
+        }
+        LOG(MediaSource, "SourceBuffer::reenqueueMediaForTime(%p): Adding displaying sample to decodeQueue: %s", this, toString(iter->first.first).utf8().data());
 #endif
-        ; ++iter)
         trackBuffer.decodeQueue.insert(*iter);
+    }
     provideMediaData(trackBuffer, trackID);
 
     trackBuffer.needsReenqueueing = false;
