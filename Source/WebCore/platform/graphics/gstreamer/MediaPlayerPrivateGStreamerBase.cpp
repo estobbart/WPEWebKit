@@ -1746,6 +1746,7 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::generateKeyReque
             return MediaPlayer::NoError;
         }
 
+#ifdef DROP_PSSH
         // there can be only 1 pssh, so skip this one (fixed lemgth)
         // Data: <4 bytes total length><4 bytes FCC><4 bytes length ex this><Given Bytes in last length field><16 bytes GUID><4 bytes length ex this><Given Bytes in last length field>
         // https://www.w3.org/TR/2014/WD-encrypted-media-20140828/cenc-format.html
@@ -1758,9 +1759,16 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::generateKeyReque
         GST_TRACE("current init data size %u, substracted %u", initDataLength, boxLength);
         GST_MEMDUMP ("init data", &(initDataPtr[boxLength]), (initDataLength - boxLength));
 
+        RefPtr<Uint8Array> initData = Uint8Array::create(&(initDataPtr[boxLength]), initDataLength-boxLength);
+#else
+        GST_TRACE("current init data size %u", initDataLength);
+        GST_MEMDUMP ("init data", initDataPtr, initDataLength);
+
+        RefPtr<Uint8Array> initData = Uint8Array::create(initDataPtr, initDataLength);
+#endif
+
         unsigned short errorCode;
         uint32_t systemCode;
-        RefPtr<Uint8Array> initData = Uint8Array::create(&(initDataPtr[boxLength]), initDataLength-boxLength);
         String destinationURL;
         RefPtr<Uint8Array> result = prSession->playreadyGenerateKeyRequest(initData.get(), customData, destinationURL, errorCode, systemCode);
         if (errorCode) {
