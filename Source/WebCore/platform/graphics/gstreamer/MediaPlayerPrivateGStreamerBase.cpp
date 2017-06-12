@@ -153,7 +153,7 @@ static const GstStreamVolumeFormat VOLUME_FORMAT = GST_STREAM_VOLUME_FORMAT_CUBI
 
 void registerWebKitGStreamerElements()
 {
-    if (!webkitGstCheckVersion(1, 6, 1))
+    if (!webkitGstCheckVersion(1, 4, 4))
         return;
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA)
