@@ -33,7 +33,7 @@
 namespace WebCore {
 
 // Suggested by the HTML5 spec.
-unsigned localStorageDatabaseQuotaInBytes = 5 * 1024 * 1024;
+unsigned localStorageDatabaseQuotaInBytes = 100 * 1024;
 
 StorageNamespaceProvider::StorageNamespaceProvider()
 {
