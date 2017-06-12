@@ -188,6 +188,10 @@ protected:
     float m_seekTime;
     GRefPtr<GstElement> m_source;
     bool m_volumeAndMuteInitialized;
+    // TODO: EOS temporary fix. To be removed once BCOM-1927 is fixed.
+#if PLATFORM(BROADCOM)
+    GRefPtr<GstElement> m_webkitAudioSink;
+#endif
 
     static GstSeekFlags hardwareDependantSeekFlags();
     void readyTimerFired();
