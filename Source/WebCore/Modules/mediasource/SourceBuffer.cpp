@@ -523,13 +523,13 @@ ExceptionOr<void> SourceBuffer::appendBufferInternal(const unsigned char* data, 
     evictCodedFrames(size);
 
     // FIXME: enable this code when MSE libraries have been updated to support it.
-#if USE(GSTREAMER)
+//#if USE(GSTREAMER)
     // 5. If the buffer full flag equals true, then throw a QUOTA_EXCEEDED_ERR exception and abort these step.
     if (m_bufferFull) {
         WTFLogAlways("WARNING: SourceBuffer::appendBufferInternal(%p) -  buffer full, failing with QUOTA_EXCEEDED_ERR error", this);
         return Exception { QUOTA_EXCEEDED_ERR };
     }
-#endif
+//#endif
 
     // NOTE: Return to 3.2 appendBuffer()
     // 3. Add data to the end of the input buffer.
@@ -579,13 +579,15 @@ void SourceBuffer::appendBufferTimerFired()
     }
 
     m_private->append(m_pendingAppendData.data(), appendSize);
-    m_pendingAppendData.clear();
 }
 
 void SourceBuffer::sourceBufferPrivateAppendComplete(SourceBufferPrivate*, AppendResult result)
 {
     if (isRemoved())
         return;
+
+    if (m_pendingAppendData.size())
+        m_pendingAppendData.clear();
 
     // Resolve the changes it TrackBuffers' buffered ranges
     // into the SourceBuffer's buffered ranges
@@ -671,9 +673,9 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
     UNUSED_PARAM(buffer);
 #endif
 
-#if USE(GSTREAMER)
-    MediaTime microsecond = MediaTime::createWithDouble(0.000001);
-#endif
+// #if USE(GSTREAMER)
+//     MediaTime microsecond = MediaTime::createWithDouble(0.000001);
+// #endif
     PlatformTimeRanges erasedRanges;
     for (auto sampleIt : samples) {
         const DecodeOrderSampleMap::KeyType& decodeKey = sampleIt.first;
@@ -691,11 +693,11 @@ static PlatformTimeRanges removeSamplesFromTrackBuffer(const DecodeOrderSampleMa
         trackBuffer.decodeQueue.erase(decodeKey);
 
         auto startTime = sample->presentationTime();
-#if USE(GSTREAMER)
-        auto endTime = startTime + sample->duration() + microsecond;
-#else
+// #if USE(GSTREAMER)
+//         auto endTime = startTime + sample->duration() + microsecond;
+// #else
         auto endTime = startTime + sample->duration();
-#endif
+// #endif
         erasedRanges.add(startTime, endTime);
 
 #if !LOG_DISABLED
@@ -828,7 +830,7 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
         if (m_active && currentMediaTime >= start && currentMediaTime < end && m_private->readyState() > MediaPlayer::HaveMetadata)
             m_private->setReadyState(MediaPlayer::HaveMetadata);
     }
-    
+
     updateBufferedFromTrackBuffers();
 
     // 4. If buffer full flag equals true and this object is ready to accept more bytes, then set the buffer full flag to false.

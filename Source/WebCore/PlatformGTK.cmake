@@ -1,4 +1,5 @@
-include(platform/GStreamer.cmake)
+# include(platform/GStreamer.cmake)
+include(platform/Helio.cmake)
 include(platform/ImageDecoders.cmake)
 include(platform/Linux.cmake)
 
@@ -137,7 +138,7 @@ list(APPEND WebCore_SOURCES
 
     platform/graphics/glx/GLContextGLX.cpp
 
-    platform/graphics/gstreamer/ImageGStreamerCairo.cpp
+    # platform/graphics/gstreamer/ImageGStreamerCairo.cpp
 
     platform/graphics/harfbuzz/HarfBuzzFace.cpp
     platform/graphics/harfbuzz/HarfBuzzFaceCairo.cpp

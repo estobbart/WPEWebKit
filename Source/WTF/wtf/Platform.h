@@ -43,7 +43,7 @@
 #define CPU(WTF_FEATURE) (defined WTF_CPU_##WTF_FEATURE  && WTF_CPU_##WTF_FEATURE)
 /* HAVE() - specific system features (headers, functions or similar) that are present or not */
 #define HAVE(WTF_FEATURE) (defined HAVE_##WTF_FEATURE  && HAVE_##WTF_FEATURE)
-/* OS() - underlying operating system; only to be used for mandated low-level services like 
+/* OS() - underlying operating system; only to be used for mandated low-level services like
    virtual memory, not to choose a GUI toolkit */
 #define OS(WTF_FEATURE) (defined WTF_OS_##WTF_FEATURE  && WTF_OS_##WTF_FEATURE)
 
@@ -290,7 +290,7 @@
 
 
 /* CPU(ARMV5_OR_LOWER) - ARM instruction set v5 or earlier */
-/* On ARMv5 and below the natural alignment is required. 
+/* On ARMv5 and below the natural alignment is required.
    And there are some other differences for v5 or earlier. */
 #if !defined(ARMV5_OR_LOWER) && !WTF_ARM_ARCH_AT_LEAST(6)
 #define WTF_CPU_ARMV5_OR_LOWER 1
@@ -346,7 +346,7 @@
 #define WTF_CPU_NEEDS_ALIGNED_ACCESS 1
 #endif
 
-/* ==== OS() - underlying operating system; only to be used for mandated low-level services like 
+/* ==== OS() - underlying operating system; only to be used for mandated low-level services like
    virtual memory, not to choose a GUI toolkit ==== */
 
 /* OS(AIX) - AIX */
@@ -622,7 +622,7 @@
 #define HAVE_STRINGS_H 1
 #define HAVE_STRNSTR 1
 #define HAVE_SYS_PARAM_H 1
-#define HAVE_SYS_TIME_H 1 
+#define HAVE_SYS_TIME_H 1
 #define HAVE_TM_GMTOFF 1
 #define HAVE_TM_ZONE 1
 #define HAVE_TIMEGM 1
@@ -938,7 +938,8 @@
 #if ENABLE(GSTREAMER_WINCAIRO)
 #define USE_MEDIA_FOUNDATION 0
 #define USE_GLIB 1
-#define USE_GSTREAMER 1
+// #define USE_GSTREAMER 1
+#define USE_HELIO 1
 #else
 #define USE_MEDIA_FOUNDATION 1
 #endif
@@ -980,7 +981,7 @@
 #include <wtf/efl/EflTypedefs.h>
 #endif
 
-/* FIXME: This define won't be needed once #27551 is fully landed. However, 
+/* FIXME: This define won't be needed once #27551 is fully landed. However,
    since most ports try to support sub-project independence, adding new headers
    to WTF causes many ports to break, and so this way we can address the build
    breakages one port at a time. */
@@ -1008,9 +1009,11 @@
 #define ENABLE_BINDING_INTEGRITY 1
 #endif
 
+/* FIXME: This doesn't build on OSX when compiling jsc binary
 #if !defined(ENABLE_JS_MEMORY_TRACKING) && !defined(NDEBUG)
-//#define ENABLE_JS_MEMORY_TRACKING 1 // TODO: This doesn't build on OSX when compiling jsc binary
+#define ENABLE_JS_MEMORY_TRACKING 1
 #endif
+*/
 
 #if PLATFORM(COCOA)
 #define USE_AVFOUNDATION 1
@@ -1162,8 +1165,8 @@
 #define ENABLE_OPENTYPE_MATH 1
 #endif
 
-/* Set TARGET_OS_IPHONE to 0 by default to allow using it as a guard 
- * in cross-platform the same way as it is used in OS(DARWIN) code. */ 
+/* Set TARGET_OS_IPHONE to 0 by default to allow using it as a guard
+ * in cross-platform the same way as it is used in OS(DARWIN) code. */
 #if !defined(TARGET_OS_IPHONE) && !OS(DARWIN)
 #define TARGET_OS_IPHONE 0
 #endif

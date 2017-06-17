@@ -87,6 +87,8 @@ function aptIfElse {
 
 function installDependenciesWithApt {
     # These are dependencies necessary for building WebKitGTK+.
+    # libgstreamer1.0-dev \
+    # libgstreamer-plugins-base1.0-dev \
     packages=" \
         autoconf \
         automake \
@@ -113,8 +115,6 @@ function installDependenciesWithApt {
         libgl1-mesa-glx \
         libgtk2.0-dev \
         libgtk-3-dev \
-        libgstreamer1.0-dev \
-        libgstreamer-plugins-base1.0-dev \
         libgudev-1.0-dev \
         libhyphen-dev \
         libjpeg-dev \
@@ -217,6 +217,8 @@ function installDependenciesWithApt {
 
 function installDependenciesWithPacman {
     # These are dependencies necessary for building WebKitGTK+.
+    # gstreamer \
+    # gst-plugins-base-libs \
     packages=" \
         autoconf \
         automake \
@@ -233,8 +235,6 @@ function installDependenciesWithPacman {
         gperf \
         grep \
         groff \
-        gstreamer \
-        gst-plugins-base-libs \
         gzip \
         hyphen \
         libtool \
@@ -357,6 +357,8 @@ function installDependenciesWithPacman {
 
 function installDependenciesWithDnf {
     # These are dependencies necessary for building WebKitGTK+.
+    # gstreamer1-devel \
+    # gstreamer1-plugins-base-devel \
     packages=" \
         atk-devel \
         autoconf \
@@ -371,8 +373,6 @@ function installDependenciesWithDnf {
         gettext-devel \
         gobject-introspection-devel \
         gperf \
-        gstreamer1-devel \
-        gstreamer1-plugins-base-devel \
         gtk-doc \
         gtk2-devel \
         gtk3-devel \
@@ -470,4 +470,3 @@ function installDependenciesWithDnf {
 }
 
 checkInstaller
-

@@ -1,4 +1,5 @@
-include(platform/GStreamer.cmake)
+# include(platform/GStreamer.cmake)
+include(platform/Helio.cmake)
 include(platform/ImageDecoders.cmake)
 include(platform/Linux.cmake)
 include(platform/TextureMapper.cmake)
@@ -274,5 +275,3 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/keys/CryptoKeyRSA.cpp
     )
 endif ()
-
-
