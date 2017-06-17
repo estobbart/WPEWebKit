@@ -1,4 +1,5 @@
-include(platform/GStreamer.cmake)
+# include(platform/GStreamer.cmake)
+include(platform/Helio.cmake)
 include(platform/ImageDecoders.cmake)
 include(platform/Linux.cmake)
 include(platform/TextureMapper.cmake)
@@ -292,3 +293,4 @@ if (USE_QT5WEBRTC)
         ${QT5WEBRTC_LIBRARIES}
     )
 endif ()
+

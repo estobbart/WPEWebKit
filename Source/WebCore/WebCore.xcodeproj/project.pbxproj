@@ -5986,6 +5986,14 @@
 		D0EDA775143E303C0028E383 /* CachedRawResource.h in Headers */ = {isa = PBXBuildFile; fileRef = D0EDA773143E303C0028E383 /* CachedRawResource.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		D0FF2A5D11F8C45A007E74E0 /* PingLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D0FF2A5B11F8C45A007E74E0 /* PingLoader.cpp */; };
 		D0FF2A5E11F8C45A007E74E0 /* PingLoader.h in Headers */ = {isa = PBXBuildFile; fileRef = D0FF2A5C11F8C45A007E74E0 /* PingLoader.h */; };
+		D20CBD3B1EFDCCEB00A1CF78 /* MediaSampleHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D27CB03A1EFDCA7000B45384 /* MediaSampleHelio.h */; };
+		D20CBD3C1EFDCCED00A1CF78 /* MediaSampleHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D27CB0391EFDCA7000B45384 /* MediaSampleHelio.cpp */; };
+		D2AC95181EF721C2005588A4 /* MediaPlayerPrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2AC95121EF721AE005588A4 /* MediaPlayerPrivateHelio.cpp */; };
+		D2AC95191EF721C5005588A4 /* MediaPlayerPrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D2AC95131EF721AE005588A4 /* MediaPlayerPrivateHelio.h */; };
+		D2AC951A1EF721C9005588A4 /* MediaSourcePrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2AC95141EF721AE005588A4 /* MediaSourcePrivateHelio.cpp */; };
+		D2AC951B1EF721CB005588A4 /* MediaSourcePrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D2AC95151EF721AE005588A4 /* MediaSourcePrivateHelio.h */; };
+		D2AC951C1EF721CE005588A4 /* SourceBufferPrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */; };
+		D2AC951D1EF721D1005588A4 /* SourceBufferPrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */; };
 		D302754912A5FE84004BD828 /* RenderDetailsMarker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D302754512A5FE84004BD828 /* RenderDetailsMarker.cpp */; };
 		D302754A12A5FE84004BD828 /* RenderDetailsMarker.h in Headers */ = {isa = PBXBuildFile; fileRef = D302754612A5FE84004BD828 /* RenderDetailsMarker.h */; };
 		D359D789129CA2710006E5D2 /* HTMLDetailsElement.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D359D786129CA2710006E5D2 /* HTMLDetailsElement.cpp */; };
@@ -6809,7 +6817,6 @@
 		FDF7E9C413AC21DB00A51EAC /* JSAudioBufferCallback.h in Headers */ = {isa = PBXBuildFile; fileRef = FDF7E9C213AC21DB00A51EAC /* JSAudioBufferCallback.h */; };
 		FE0D84E910484348001A179E /* WebEvent.h in Headers */ = {isa = PBXBuildFile; fileRef = FE0D84E810484348001A179E /* WebEvent.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		FE0D84EB1048436E001A179E /* WebEvent.mm in Sources */ = {isa = PBXBuildFile; fileRef = FE0D84EA1048436E001A179E /* WebEvent.mm */; };
-		FE3371A2167C11D400EDB752 /* DatabaseBasicTypes.h in Headers */ = {isa = PBXBuildFile; fileRef = FE3371A0167C11D400EDB752 /* DatabaseBasicTypes.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		FE36FD1516C7826500F887C1 /* ChangeVersionData.h in Headers */ = {isa = PBXBuildFile; fileRef = FE36FD1116C7826400F887C1 /* ChangeVersionData.h */; };
 		FE36FD1616C7826500F887C1 /* SQLTransactionStateMachine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FE36FD1216C7826400F887C1 /* SQLTransactionStateMachine.cpp */; };
 		FE36FD1716C7826500F887C1 /* SQLTransactionStateMachine.h in Headers */ = {isa = PBXBuildFile; fileRef = FE36FD1316C7826400F887C1 /* SQLTransactionStateMachine.h */; };
@@ -13890,6 +13897,14 @@
 		D0EDA773143E303C0028E383 /* CachedRawResource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CachedRawResource.h; sourceTree = "<group>"; };
 		D0FF2A5B11F8C45A007E74E0 /* PingLoader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PingLoader.cpp; sourceTree = "<group>"; };
 		D0FF2A5C11F8C45A007E74E0 /* PingLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PingLoader.h; sourceTree = "<group>"; };
+		D27CB0391EFDCA7000B45384 /* MediaSampleHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MediaSampleHelio.cpp; path = helio/MediaSampleHelio.cpp; sourceTree = "<group>"; };
+		D27CB03A1EFDCA7000B45384 /* MediaSampleHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MediaSampleHelio.h; path = helio/MediaSampleHelio.h; sourceTree = "<group>"; };
+		D2AC95121EF721AE005588A4 /* MediaPlayerPrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MediaPlayerPrivateHelio.cpp; path = helio/MediaPlayerPrivateHelio.cpp; sourceTree = "<group>"; };
+		D2AC95131EF721AE005588A4 /* MediaPlayerPrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MediaPlayerPrivateHelio.h; path = helio/MediaPlayerPrivateHelio.h; sourceTree = "<group>"; };
+		D2AC95141EF721AE005588A4 /* MediaSourcePrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MediaSourcePrivateHelio.cpp; path = helio/MediaSourcePrivateHelio.cpp; sourceTree = "<group>"; };
+		D2AC95151EF721AE005588A4 /* MediaSourcePrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MediaSourcePrivateHelio.h; path = helio/MediaSourcePrivateHelio.h; sourceTree = "<group>"; };
+		D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SourceBufferPrivateHelio.cpp; path = helio/SourceBufferPrivateHelio.cpp; sourceTree = "<group>"; };
+		D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SourceBufferPrivateHelio.h; path = helio/SourceBufferPrivateHelio.h; sourceTree = "<group>"; };
 		D302754512A5FE84004BD828 /* RenderDetailsMarker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RenderDetailsMarker.cpp; sourceTree = "<group>"; };
 		D302754612A5FE84004BD828 /* RenderDetailsMarker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RenderDetailsMarker.h; sourceTree = "<group>"; };
 		D359D786129CA2710006E5D2 /* HTMLDetailsElement.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HTMLDetailsElement.cpp; sourceTree = "<group>"; };
@@ -14815,7 +14830,6 @@
 		FDF7E9C213AC21DB00A51EAC /* JSAudioBufferCallback.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JSAudioBufferCallback.h; sourceTree = "<group>"; };
 		FE0D84E810484348001A179E /* WebEvent.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebEvent.h; sourceTree = "<group>"; };
 		FE0D84EA1048436E001A179E /* WebEvent.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WebEvent.mm; sourceTree = "<group>"; };
-		FE3371A0167C11D400EDB752 /* DatabaseBasicTypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DatabaseBasicTypes.h; sourceTree = "<group>"; };
 		FE36FD1116C7826400F887C1 /* ChangeVersionData.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ChangeVersionData.h; sourceTree = "<group>"; };
 		FE36FD1216C7826400F887C1 /* SQLTransactionStateMachine.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SQLTransactionStateMachine.cpp; sourceTree = "<group>"; };
 		FE36FD1316C7826400F887C1 /* SQLTransactionStateMachine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SQLTransactionStateMachine.h; sourceTree = "<group>"; };
@@ -21386,6 +21400,7 @@
 				0FE5FBC91C3DD5060007A2CA /* displaylists */,
 				A75E8B7F0E1DE2B0007F2481 /* filters */,
 				498770C11242C50D002226BA /* gpu */,
+				D2AC95111EF72199005588A4 /* helio */,
 				441AF0A70EBA7BBF0044ED4B /* ios */,
 				B27535490B053814002CE64F /* mac */,
 				FBC220DD1237FBEB00BCF788 /* opengl */,
@@ -22762,6 +22777,21 @@
 				E1FE13621834351100892F13 /* CryptoDigestCommonCrypto.cpp */,
 			);
 			path = commoncrypto;
+			sourceTree = "<group>";
+		};
+		D2AC95111EF72199005588A4 /* helio */ = {
+			isa = PBXGroup;
+			children = (
+				D27CB0391EFDCA7000B45384 /* MediaSampleHelio.cpp */,
+				D27CB03A1EFDCA7000B45384 /* MediaSampleHelio.h */,
+				D2AC95121EF721AE005588A4 /* MediaPlayerPrivateHelio.cpp */,
+				D2AC95131EF721AE005588A4 /* MediaPlayerPrivateHelio.h */,
+				D2AC95141EF721AE005588A4 /* MediaSourcePrivateHelio.cpp */,
+				D2AC95151EF721AE005588A4 /* MediaSourcePrivateHelio.h */,
+				D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */,
+				D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */,
+			);
+			name = helio;
 			sourceTree = "<group>";
 		};
 		DF9AFD6F13FC31B00015FEB7 /* objc */ = {
@@ -25574,6 +25604,7 @@
 				A81369D0097374F600D74463 /* HTMLFormElement.h in Headers */,
 				A871DE2B0A152AC800B12A68 /* HTMLFrameElement.h in Headers */,
 				14FFE31D0AE1963300136BF5 /* HTMLFrameElementBase.h in Headers */,
+				D2AC95191EF721C5005588A4 /* MediaPlayerPrivateHelio.h in Headers */,
 				93E241FF0B2B4E4000C732A1 /* HTMLFrameOwnerElement.h in Headers */,
 				A871DE280A152AC800B12A68 /* HTMLFrameSetElement.h in Headers */,
 				A871DE2D0A152AC800B12A68 /* HTMLHeadElement.h in Headers */,
@@ -25680,6 +25711,7 @@
 				5185FC7E1BB4C4E80012898F /* IDBCursorWithValue.h in Headers */,
 				5185FC811BB4C4E80012898F /* IDBDatabase.h in Headers */,
 				5185FC831BB4C4E80012898F /* IDBDatabaseError.h in Headers */,
+				D2AC951D1EF721D1005588A4 /* SourceBufferPrivateHelio.h in Headers */,
 				5185FC851BB4C4E80012898F /* IDBDatabaseException.h in Headers */,
 				5185FC871BB4C4E80012898F /* IDBDatabaseIdentifier.h in Headers */,
 				51BA4AC41BBB5CD800DF3D6D /* IDBDatabaseInfo.h in Headers */,
@@ -27239,6 +27271,7 @@
 				A79BADA4161E7F3F00C2E652 /* RuleSet.h in Headers */,
 				2D76BB821945632400CFD29A /* RunLoopObserver.h in Headers */,
 				1A569D1F0D7E2B82007C3983 /* runtime_array.h in Headers */,
+				D20CBD3B1EFDCCEB00A1CF78 /* MediaSampleHelio.h in Headers */,
 				1A569D210D7E2B82007C3983 /* runtime_method.h in Headers */,
 				1A569D230D7E2B82007C3983 /* runtime_object.h in Headers */,
 				1A569D250D7E2B82007C3983 /* runtime_root.h in Headers */,
@@ -27700,6 +27733,7 @@
 				BC22747B0E8366E200E7F975 /* SVGRenderStyleDefs.h in Headers */,
 				436708F212D9CA4B00044234 /* SVGRenderSupport.h in Headers */,
 				436708F412D9CA4B00044234 /* SVGRenderTreeAsText.h in Headers */,
+				D2AC951B1EF721CB005588A4 /* MediaSourcePrivateHelio.h in Headers */,
 				436708F612D9CA4B00044234 /* SVGResources.h in Headers */,
 				436708F812D9CA4B00044234 /* SVGResourcesCache.h in Headers */,
 				436708FA12D9CA4B00044234 /* SVGResourcesCycleSolver.h in Headers */,
@@ -29277,6 +29311,7 @@
 				7C3E510B18DF8F3500C112F7 /* HTMLConverter.mm in Sources */,
 				83120C701C56F3F6001CB112 /* HTMLDataElement.cpp in Sources */,
 				F5C041DA0FFCA7CE00839D4A /* HTMLDataListElement.cpp in Sources */,
+				D20CBD3C1EFDCCED00A1CF78 /* MediaSampleHelio.cpp in Sources */,
 				D359D789129CA2710006E5D2 /* HTMLDetailsElement.cpp in Sources */,
 				A8EA79F90A1916DF00A8EF5F /* HTMLDirectoryElement.cpp in Sources */,
 				A8EA7CB10A192B9C00A8EF5F /* HTMLDivElement.cpp in Sources */,
@@ -29614,6 +29649,7 @@
 				142011B60A003133008303F9 /* JSCSSStyleDeclaration.cpp in Sources */,
 				BC5825F30C0B89380053F1B5 /* JSCSSStyleDeclarationCustom.cpp in Sources */,
 				BC46C2060C0DDCA10020CFC3 /* JSCSSStyleRule.cpp in Sources */,
+				D2AC95181EF721C2005588A4 /* MediaPlayerPrivateHelio.cpp in Sources */,
 				BCC5BE000C0E93110011C2DB /* JSCSSStyleSheet.cpp in Sources */,
 				FD67773A195CB14A0072E0D3 /* JSCSSSupportsRule.cpp in Sources */,
 				14CF78A409F58CBF00EB3665 /* JSCSSValue.cpp in Sources */,
@@ -30541,6 +30577,7 @@
 				52F52E1114A0134F00ACC397 /* NSScrollerImpDetails.mm in Sources */,
 				F55B3DC71251F12D003EF269 /* NumberInputType.cpp in Sources */,
 				1A569D130D7E2B82007C3983 /* objc_class.mm in Sources */,
+				D2AC951A1EF721C9005588A4 /* MediaSourcePrivateHelio.cpp in Sources */,
 				1A569D160D7E2B82007C3983 /* objc_instance.mm in Sources */,
 				1A569D180D7E2B82007C3983 /* objc_runtime.mm in Sources */,
 				1A569D1A0D7E2B82007C3983 /* objc_utility.mm in Sources */,
@@ -31601,6 +31638,7 @@
 				2E4346480F546A8200B0F1BA /* WorkerGlobalScope.cpp in Sources */,
 				418C395A1C8DD6990051C8A3 /* WorkerGlobalScopeFetch.cpp in Sources */,
 				5185FCB31BB4C4E80012898F /* WorkerGlobalScopeIndexedDatabase.cpp in Sources */,
+				D2AC951C1EF721CE005588A4 /* SourceBufferPrivateHelio.cpp in Sources */,
 				97F8E665151D4A4B00D2D181 /* WorkerGlobalScopeNotifications.cpp in Sources */,
 				A54A0C611DB7F8C10017A90B /* WorkerInspectorController.cpp in Sources */,
 				A54A0C6B1DB831F90017A90B /* WorkerInspectorProxy.cpp in Sources */,

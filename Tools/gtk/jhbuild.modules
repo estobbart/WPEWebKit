@@ -24,11 +24,11 @@
       <dep package="icu"/>
       <dep package="libsoup"/>
       <dep package="atk"/>
-      <dep package="gstreamer"/>
+      <!-- <dep package="gstreamer"/>
       <dep package="gst-plugins-base"/>
       <dep package="gst-plugins-good"/>
       <dep package="gst-plugins-bad"/>
-      <dep package="gst-libav"/>
+      <dep package="gst-libav"/> -->
       <dep package="openwebrtc"/>
       <dep package="llvm"/>
       <dep package="shared-mime-info"/>
@@ -62,8 +62,8 @@
       href="http://xorg.freedesktop.org"/>
   <repository type="tarball" name="xmlsoft.org"
       href="http://xmlsoft.org"/>
-  <repository type="tarball" name="gstreamer"
-      href="http://gstreamer.freedesktop.org/src/"/>
+  <!-- <repository type="tarball" name="gstreamer"
+      href="http://gstreamer.freedesktop.org/src/"/> -->
   <repository type="tarball" name="savannah.gnu.org"
       href="http://download.savannah.gnu.org/releases/"/>
   <repository type="git" name="freedesktop-git"
@@ -237,7 +237,7 @@
             tag="f7292448160128b3cb4b7cd06c2447f81fd8c6c9"/>
   </autotools>
 
-  <autotools id="fontconfig" 
+  <autotools id="fontconfig"
              autogen-sh="configure"
              autogenargs="--enable-libxml2">
     <if condition-set="macos">
@@ -296,7 +296,7 @@
             hash="sha256:0dddfa73a02178ca21a8de172c86d699aa887b4efeec736b4c8721eee4ac349c"/>
   </autotools>
 
-  <autotools id="at-spi2-core" 
+  <autotools id="at-spi2-core"
              autogenargs="--disable-introspection">
     <branch module="pub/GNOME/sources/at-spi2-core/2.15/at-spi2-core-2.15.4.tar.xz" version="2.15.4"
             repo="ftp.gnome.org"
@@ -336,6 +336,7 @@
     </dependencies>
   </autotools>
 
+ <!-- TODO: Does anything else use ORC besides gstreamer? -->
   <autotools id="orc" autogenargs="--disable-gtk-doc" autogen-sh="configure">
     <branch module="orc/orc-0.4.17.tar.gz" version="0.4.17"
             repo="gstreamer"
@@ -343,7 +344,7 @@
             md5sum="af1bf3dab9e69f3c36f389285e2a12a1"/>
   </autotools>
 
-  <autotools id="gstreamer" autogenargs="--disable-gtk-doc">
+  <!-- <autotools id="gstreamer" autogenargs="--disable-gtk-doc">
     <if condition-set="macos">
       <autogenargs value="--disable-introspection"/>
     </if>
@@ -354,9 +355,9 @@
             repo="gstreamer"
             hash="sha256:947a314a212b5d94985d89b43440dbe66b696e12bbdf9a2f78967b98d74abedc"
             md5sum="6846d7289ec323c38c49b818171e955a"/>
-  </autotools>
+  </autotools> -->
 
-  <autotools id="gst-plugins-base"
+  <!-- <autotools id="gst-plugins-base"
              autogen-sh="autogen.sh"
              autogenargs="--disable-examples --disable-gtk-doc">
     <if condition-set="macos">
@@ -369,9 +370,9 @@
             repo="gstreamer"
             hash="sha256:abc0acc1d15b4b9c97c65cd9689bd6400081853b9980ea428d3c8572dd791522"
             md5sum="20cc8231609318310f2a55f64c86cbb4"/>
-  </autotools>
+  </autotools> -->
 
-  <autotools id="gst-plugins-good" autogenargs="--disable-examples --disable-soup --disable-gtk-doc">
+  <!-- <autotools id="gst-plugins-good" autogenargs="--disable-examples --disable-soup --disable-gtk-doc">
     <if condition-set="macos">
       <autogenargs value="--disable-introspection"/>
     </if>
@@ -386,9 +387,9 @@
       <patch file="gst-plugins-good-use-the-tfdt-decode-time.patch" strip="1"/>
       <patch file="gst-plugins-good-Revert-qtdemux-expose-streams-with-first-moof-for-fr.patch" strip="1"/>
     </branch>
-  </autotools>
+  </autotools> -->
 
-  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc">
+  <!-- <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc">
     <if condition-set="macos">
       <autogenargs value="--disable-introspection"/>
     </if>
@@ -399,9 +400,9 @@
             repo="gstreamer"
             hash="sha256:116376dd1085082422e0b21b0ecd3d1cb345c469c58e32463167d4675f4ca90e"
             md5sum="1c2d797bb96a81e9ef570c7a0a37203e"/>
-  </autotools>
+  </autotools> -->
 
-  <autotools id="gst-libav" autogenargs="--with-libav-extra-configure='--disable-yasm' --disable-gtk-doc">
+  <!-- <autotools id="gst-libav" autogenargs="--with-libav-extra-configure='--disable-yasm' --disable-gtk-doc">
     <dependencies>
       <dep package="gst-plugins-base"/>
     </dependencies>
@@ -409,7 +410,7 @@
             repo="gstreamer"
             hash="sha256:5a1ce28876aee93cb4f3d090f0e807915a5d9bc1325e3480dd302b85aeb4291c"
             md5sum="361638fa45466c5050bcde6bfe10fa46"/>
-  </autotools>
+  </autotools> -->
 
   <autotools id="xserver" autogenargs="--disable-xinerama --enable-glx --enable-composite --disable-xorg --disable-dmx --disable-xnest --disable-xquartz --disable-xwin --disable-xephyr --disable-xfake --disable-xfbdev --disable-install-setuid --disable-unit-tests --disable-present --enable-unix-transport --enable-tcp-transport --disable-local-transport --with-xkb-path=/usr/share/X11/xkb --with-xkb-output=/var/lib/xkb --with-xkb-bin-directory=/usr/bin --without-dtrace">
     <dependencies>
@@ -494,13 +495,13 @@
     <branch repo="github.com" module="sctplab/usrsctp.git" checkoutdir="usrsctp" tag="078ff3252f73327e0ac11d6fd5eff62011f6646e"/>
    </autotools>
 
-   <autotools id="gst-plugins-openwebrtc" supports-parallel-builds="no" supports-non-srcdir-builds="no" autogen-sh="./autogen.sh; ./configure">
+   <!-- <autotools id="gst-plugins-openwebrtc" supports-parallel-builds="no" supports-non-srcdir-builds="no" autogen-sh="./autogen.sh; ./configure">
      <dependencies>
        <dep package="gst-plugins-base"/>
        <dep package="libusrsctp"/>
      </dependencies>
     <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="f40f3302007da00f0bfb82065d705b62c2ea1afd"/>
-   </autotools>
+   </autotools> -->
 
    <autotools id="libnice" supports-non-srcdir-builds="no">
     <dependencies>
@@ -511,8 +512,8 @@
 
   <autotools id="openwebrtc" autogenargs="--enable-bridge=no --enable-owr-gst=yes">
     <dependencies>
-      <dep package="gst-plugins-openwebrtc"/>
-      <dep package="gst-plugins-bad"/>
+      <!-- <dep package="gst-plugins-openwebrtc"/>
+      <dep package="gst-plugins-bad"/> -->
       <dep package="libnice"/>
      </dependencies>
     <branch repo="github.com" module="EricssonResearch/openwebrtc.git" checkoutdir="openwebrtc" tag="0b28b080d61af3adb1f779e693fc029f9c1ad499"/>

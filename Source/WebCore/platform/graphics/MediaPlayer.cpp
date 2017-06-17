@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -51,18 +51,24 @@
 #include "MediaStreamPrivate.h"
 #endif
 
-#if USE(GSTREAMER)
-#include "MediaPlayerPrivateGStreamer.h"
-#if ENABLE(MEDIA_STREAM) && USE(OPENWEBRTC)
-#include "MediaPlayerPrivateGStreamerOwr.h"
-#endif
-#define PlatformMediaEngineClassName MediaPlayerPrivateGStreamer
-#if ENABLE(VIDEO) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
-#include "MediaPlayerPrivateGStreamerMSE.h"
-#endif
-#endif // USE(GSTREAMER)
+// #if USE(GSTREAMER)
+// #include "MediaPlayerPrivateGStreamer.h"
+// #if ENABLE(MEDIA_STREAM) && USE(OPENWEBRTC)
+// #include "MediaPlayerPrivateGStreamerOwr.h"
+// #endif
+// #define PlatformMediaEngineClassName MediaPlayerPrivateGStreamer
+// #if ENABLE(VIDEO) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
+// #include "MediaPlayerPrivateGStreamerMSE.h"
+// #endif
+// #endif // USE(GSTREAMER)
 
-#if USE(MEDIA_FOUNDATION)
+#define HELIO 1
+#ifdef HELIO
+#include "MediaPlayerPrivateHelio.h"
+#define PlatformMediaEngineClassName MediaPlayerPrivateHelio
+#endif
+
+#if USE(MEDIA_FOUNDATION) && !USE(HELIO)
 #include "MediaPlayerPrivateMediaFoundation.h"
 #define PlatformMediaEngineClassName MediaPlayerPrivateMediaFoundation
 #endif
@@ -86,7 +92,7 @@
 
 #endif // PLATFORM(COCOA)
 
-#if PLATFORM(WIN) && USE(AVFOUNDATION) && !USE(GSTREAMER)
+#if PLATFORM(WIN) && USE(AVFOUNDATION) && (!USE(GSTREAMER) || !USE(HELIO))
 #include "MediaPlayerPrivateAVFoundationCF.h"
 #endif
 
@@ -242,21 +248,25 @@ static void buildMediaEnginesVector()
     MediaPlayerPrivateQt5WebRTC::registerMediaEngine(addMediaEngine);
 #endif
 
-#if ENABLE(MEDIA_STREAM) && USE(GSTREAMER) && USE(OPENWEBRTC)
-    if (Settings::isGStreamerEnabled())
-        MediaPlayerPrivateGStreamerOwr::registerMediaEngine(addMediaEngine);
-#endif
+// #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER) && USE(OPENWEBRTC)
+//     if (Settings::isGStreamerEnabled())
+//         MediaPlayerPrivateGStreamerOwr::registerMediaEngine(addMediaEngine);
+// #endif
 
 #if defined(PlatformMediaEngineClassName)
-#if USE(GSTREAMER)
-    if (Settings::isGStreamerEnabled())
-#endif
+// #if USE(GSTREAMER)
+//     if (Settings::isGStreamerEnabled())
+// #endif
         PlatformMediaEngineClassName::registerMediaEngine(addMediaEngine);
 #endif
 
-#if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
-    if (Settings::isGStreamerEnabled())
-        MediaPlayerPrivateGStreamerMSE::registerMediaEngine(addMediaEngine);
+// #if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
+//     if (Settings::isGStreamerEnabled())
+//         MediaPlayerPrivateGStreamerMSE::registerMediaEngine(addMediaEngine);
+// #endif
+
+#ifdef HELIO
+  MediaPlayerPrivateHelio::registerMediaEngine(addMediaEngine);
 #endif
 
 #if USE(HOLE_PUNCH_EXTERNAL)
@@ -342,7 +352,7 @@ static const MediaPlayerFactory* nextMediaEngine(const MediaPlayerFactory* curre
     if (engines.isEmpty())
         return nullptr;
 
-    if (!current) 
+    if (!current)
         return &engines.first();
 
     size_t currentIndex = current - &engines.first();
@@ -467,7 +477,7 @@ const MediaPlayerFactory* MediaPlayer::nextBestMediaEngine(const MediaPlayerFact
 
 void MediaPlayer::loadWithNextMediaEngine(const MediaPlayerFactory* current)
 {
-#if ENABLE(MEDIA_SOURCE) 
+#if ENABLE(MEDIA_SOURCE)
 #define MEDIASOURCE m_mediaSource
 #else
 #define MEDIASOURCE 0
@@ -547,12 +557,12 @@ bool MediaPlayer::canLoadPoster() const
 void MediaPlayer::setPoster(const String& url)
 {
     m_private->setPoster(url);
-}    
+}
 
 void MediaPlayer::cancelLoad()
 {
     m_private->cancelLoad();
-}    
+}
 
 void MediaPlayer::prepareToPlay()
 {
@@ -607,7 +617,7 @@ void MediaPlayer::keyAdded()
     m_private->keyAdded();
 }
 #endif
-    
+
 MediaTime MediaPlayer::duration() const
 {
     return m_private->durationMediaTime();
@@ -702,7 +712,7 @@ PlatformLayer* MediaPlayer::platformLayer() const
 {
     return m_private->platformLayer();
 }
-    
+
 #if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
 void MediaPlayer::setVideoFullscreenLayer(PlatformLayer* layer, std::function<void()> completionHandler)
 {
@@ -848,7 +858,7 @@ bool MediaPlayer::didLoadingProgress()
 }
 
 void MediaPlayer::setSize(const IntSize& size)
-{ 
+{
     m_size = size;
     m_private->setSize(size);
 }
@@ -903,7 +913,7 @@ NativeImagePtr MediaPlayer::nativeImageForCurrentTime()
 
 MediaPlayer::SupportsType MediaPlayer::supportsType(const MediaEngineSupportParameters& parameters, const MediaPlayerSupportsTypeClient* client)
 {
-    // 4.8.10.3 MIME types - The canPlayType(type) method must return the empty string if type is a type that the 
+    // 4.8.10.3 MIME types - The canPlayType(type) method must return the empty string if type is a type that the
     // user agent knows it cannot render or is the type "application/octet-stream"
     if (parameters.type == applicationOctetStream())
         return IsNotSupported;
@@ -939,12 +949,12 @@ void MediaPlayer::getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& t
         engine.getSupportedTypes(engineTypes);
         types.add(engineTypes.begin(), engineTypes.end());
     }
-} 
+}
 
 bool MediaPlayer::isAvailable()
 {
     return !installedMediaEngines().isEmpty();
-} 
+}
 
 #if USE(NATIVE_FULLSCREEN_VIDEO)
 void MediaPlayer::enterFullscreen()
@@ -1101,7 +1111,7 @@ static void addToHash(HashSet<T>& toHash, HashSet<T>&& fromHash)
     else
         toHash.add(fromHash.begin(), fromHash.end());
 }
-    
+
 HashSet<RefPtr<SecurityOrigin>> MediaPlayer::originsInMediaCache(const String& path)
 {
     HashSet<RefPtr<SecurityOrigin>> origins;
@@ -1387,21 +1397,21 @@ void MediaPlayer::resetMediaEngines()
     haveMediaEnginesVector() = false;
 }
 
-#if USE(GSTREAMER)
-void MediaPlayer::simulateAudioInterruption()
-{
-    if (!m_private)
-        return;
-
-    m_private->simulateAudioInterruption();
-}
-#endif
+// #if USE(GSTREAMER)
+// void MediaPlayer::simulateAudioInterruption()
+// {
+//     if (!m_private)
+//         return;
+//
+//     m_private->simulateAudioInterruption();
+// }
+// #endif
 
 String MediaPlayer::languageOfPrimaryAudioTrack() const
 {
     if (!m_private)
         return emptyString();
-    
+
     return m_private->languageOfPrimaryAudioTrack();
 }
 
@@ -1417,7 +1427,7 @@ unsigned long long MediaPlayer::fileSize() const
 {
     if (!m_private)
         return 0;
-    
+
     return m_private->fileSize();
 }
 
