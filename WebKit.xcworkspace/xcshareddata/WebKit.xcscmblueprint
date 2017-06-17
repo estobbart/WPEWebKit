@@ -1,0 +1,30 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "94D753953040122F76D30FC1464B1B4DCE436F58",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "546E1748F37249E141A516B40CA854AE562F0933" : 9223372036854775807,
+    "94D753953040122F76D30FC1464B1B4DCE436F58" : 9223372036854775807
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "47192443-CF79-4982-A377-2857933BBF80",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "546E1748F37249E141A516B40CA854AE562F0933" : "libhelio\/",
+    "94D753953040122F76D30FC1464B1B4DCE436F58" : "WPEWebKit\/"
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "WebKit",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "WebKit.xcworkspace",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "github.comcast.com:estobb200\/libhelio.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "546E1748F37249E141A516B40CA854AE562F0933"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "github.com:estobbart\/WPEWebKit.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "94D753953040122F76D30FC1464B1B4DCE436F58"
+    }
+  ]
+}

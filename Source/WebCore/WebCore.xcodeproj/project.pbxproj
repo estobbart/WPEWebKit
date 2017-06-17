@@ -5994,6 +5994,7 @@
 		D2AC951B1EF721CB005588A4 /* MediaSourcePrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D2AC95151EF721AE005588A4 /* MediaSourcePrivateHelio.h */; };
 		D2AC951C1EF721CE005588A4 /* SourceBufferPrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */; };
 		D2AC951D1EF721D1005588A4 /* SourceBufferPrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */; };
+		D2F95A681F06B06200979D5B /* Proxy.h in Headers */ = {isa = PBXBuildFile; fileRef = D2F95A671F06B05600979D5B /* Proxy.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		D302754912A5FE84004BD828 /* RenderDetailsMarker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D302754512A5FE84004BD828 /* RenderDetailsMarker.cpp */; };
 		D302754A12A5FE84004BD828 /* RenderDetailsMarker.h in Headers */ = {isa = PBXBuildFile; fileRef = D302754612A5FE84004BD828 /* RenderDetailsMarker.h */; };
 		D359D789129CA2710006E5D2 /* HTMLDetailsElement.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D359D786129CA2710006E5D2 /* HTMLDetailsElement.cpp */; };
@@ -13905,6 +13906,7 @@
 		D2AC95151EF721AE005588A4 /* MediaSourcePrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MediaSourcePrivateHelio.h; path = helio/MediaSourcePrivateHelio.h; sourceTree = "<group>"; };
 		D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SourceBufferPrivateHelio.cpp; path = helio/SourceBufferPrivateHelio.cpp; sourceTree = "<group>"; };
 		D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SourceBufferPrivateHelio.h; path = helio/SourceBufferPrivateHelio.h; sourceTree = "<group>"; };
+		D2F95A671F06B05600979D5B /* Proxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Proxy.h; sourceTree = "<group>"; };
 		D302754512A5FE84004BD828 /* RenderDetailsMarker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RenderDetailsMarker.cpp; sourceTree = "<group>"; };
 		D302754612A5FE84004BD828 /* RenderDetailsMarker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RenderDetailsMarker.h; sourceTree = "<group>"; };
 		D359D786129CA2710006E5D2 /* HTMLDetailsElement.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HTMLDetailsElement.cpp; sourceTree = "<group>"; };
@@ -22446,6 +22448,7 @@
 				0668E1890ADD9624004128E0 /* PopupMenu.h */,
 				ABC128760B33AA6D00C693D5 /* PopupMenuClient.h */,
 				BC3BE12A0E98092F00835588 /* PopupMenuStyle.h */,
+				D2F95A671F06B05600979D5B /* Proxy.h */,
 				0081FEFD16B0A244008AAA7A /* PublicSuffix.h */,
 				9831AE49154225A200FE2644 /* ReferrerPolicy.h */,
 				CDFC360318CA61C20026E56F /* RemoteCommandListener.cpp */,
@@ -26853,6 +26856,7 @@
 				072A70401D6E8F6200DF0AFC /* OverconstrainedErrorEvent.h in Headers */,
 				1A0D57370A5C77FE007EDD4C /* OverflowEvent.h in Headers */,
 				3774ABA50FA21EB400AD7DE9 /* OverlapTestRequestClient.h in Headers */,
+				D2F95A681F06B06200979D5B /* Proxy.h in Headers */,
 				65A21468097A329100B9050A /* Page.h in Headers */,
 				1477E7770BF4134A00152872 /* PageCache.h in Headers */,
 				CD5E5B5F1A15CE54000C609E /* PageConfiguration.h in Headers */,
