@@ -99,7 +99,7 @@ WK_EXPORT void WKPageGoToBackForwardListItem(WKPageRef page, WKBackForwardListIt
 WK_EXPORT void WKPageTryRestoreScrollPosition(WKPageRef page);
 WK_EXPORT WKBackForwardListRef WKPageGetBackForwardList(WKPageRef page);
 WK_EXPORT bool WKPageWillHandleHorizontalScrollEvents(WKPageRef page);
-    
+
 WK_EXPORT WKStringRef WKPageCopyTitle(WKPageRef page);
 
 WK_EXPORT WKURLRef WKPageCopyPendingAPIRequestURL(WKPageRef page);
@@ -130,7 +130,7 @@ WK_EXPORT void WKPageSetCustomUserAgent(WKPageRef page, WKStringRef userAgent);
 WK_EXPORT void WKPageSetProxies(WKPageRef page, WKArrayRef proxies);
 
 WK_EXPORT void WKPageSetUserContentExtensionsEnabled(WKPageRef, bool);
-    
+
 WK_EXPORT bool WKPageSupportsTextEncoding(WKPageRef page);
 WK_EXPORT WKStringRef WKPageCopyCustomTextEncodingName(WKPageRef page);
 WK_EXPORT void WKPageSetCustomTextEncodingName(WKPageRef page, WKStringRef encodingName);
@@ -181,7 +181,7 @@ WK_EXPORT bool WKPageIsPinnedToLeftSide(WKPageRef page);
 WK_EXPORT bool WKPageIsPinnedToRightSide(WKPageRef page);
 WK_EXPORT bool WKPageIsPinnedToTopSide(WKPageRef page);
 WK_EXPORT bool WKPageIsPinnedToBottomSide(WKPageRef page);
-    
+
 // This API is poorly named. Even when these values are set to false, rubber-banding will
 // still be allowed to occur at the end of a momentum scroll. These values are used along
 // with pin state to determine if wheel events should be handled in the web process or if
@@ -194,13 +194,13 @@ WK_EXPORT bool WKPageRubberBandsAtTop(WKPageRef);
 WK_EXPORT void WKPageSetRubberBandsAtTop(WKPageRef, bool rubberBandsAtTop);
 WK_EXPORT bool WKPageRubberBandsAtBottom(WKPageRef);
 WK_EXPORT void WKPageSetRubberBandsAtBottom(WKPageRef, bool rubberBandsAtBottom);
-    
+
 // Rubber-banding is enabled by default.
 WK_EXPORT bool WKPageVerticalRubberBandingIsEnabled(WKPageRef);
 WK_EXPORT void WKPageSetEnableVerticalRubberBanding(WKPageRef, bool enableVerticalRubberBanding);
 WK_EXPORT bool WKPageHorizontalRubberBandingIsEnabled(WKPageRef);
 WK_EXPORT void WKPageSetEnableHorizontalRubberBanding(WKPageRef, bool enableHorizontalRubberBanding);
-    
+
 WK_EXPORT void WKPageSetBackgroundExtendsBeyondPage(WKPageRef, bool backgroundExtendsBeyondPage);
 WK_EXPORT bool WKPageBackgroundExtendsBeyondPage(WKPageRef);
 
@@ -212,7 +212,7 @@ WK_EXPORT bool WKPageIsContentEditable(WKPageRef page);
 
 WK_EXPORT void WKPageSetMaintainsInactiveSelection(WKPageRef page, bool maintainsInactiveSelection);
 WK_EXPORT void WKPageCenterSelectionInVisibleArea(WKPageRef page);
-    
+
 WK_EXPORT void WKPageFindString(WKPageRef page, WKStringRef string, WKFindOptions findOptions, unsigned maxMatchCount);
 WK_EXPORT void WKPageHideFindUI(WKPageRef page);
 WK_EXPORT void WKPageCountStringMatches(WKPageRef page, WKStringRef string, WKFindOptions findOptions, unsigned maxMatchCount);
@@ -257,7 +257,7 @@ WK_EXPORT void WKPageForceRepaint(WKPageRef page, void* context, WKPageForceRepa
 
 /*
     Some of the more common command name strings include the following, although any WebCore EditorCommand string is supported:
-    
+
     "Cut"
     "Copy"
     "Paste"

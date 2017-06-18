@@ -1009,7 +1009,7 @@
 #endif
 
 #if !defined(ENABLE_JS_MEMORY_TRACKING) && !defined(NDEBUG)
-#define ENABLE_JS_MEMORY_TRACKING 1
+//#define ENABLE_JS_MEMORY_TRACKING 1 // TODO: This doesn't build on OSX when compiling jsc binary
 #endif
 
 #if PLATFORM(COCOA)

@@ -46,6 +46,7 @@ namespace WTF {
 
 static const size_t ramSizeGuess = 512 * MB;
 
+#if OS(UNIX) && !OS(DARWIN)
 static size_t customRAMSize()
 {
     // Syntax: Case insensitive, unit multipliers (M=Mb, K=Kb, <empty>=bytes).
@@ -69,6 +70,7 @@ static size_t customRAMSize()
 
     return 0;
 }
+#endif
 
 static size_t computeRAMSize()
 {
