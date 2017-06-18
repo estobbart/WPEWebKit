@@ -366,5 +366,16 @@ void deleteAllCookiesModifiedSince(const NetworkStorageSession& session, std::ch
     [storage removeCookiesSinceDate:date];
     [storage _saveCookies];
 }
+  
+void setCookies(const NetworkStorageSession& session __attribute__((unused)), const Vector<Cookie>& cookies __attribute__((unused)))
+{
+    //TODO:
+}
+
+bool getCookies(const NetworkStorageSession& session __attribute__((unused)), Vector<Cookie>& returnCookies __attribute__((unused)))
+{
+  //TODO:
+  return false;
+}
 
 }
