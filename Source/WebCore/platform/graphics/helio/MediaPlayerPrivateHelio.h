@@ -3,6 +3,42 @@
 
 #include "MediaPlayerPrivate.h"
 
+
+/**
+ * The MediaPlayerPrivateHelio gets registered in platform/graphics/MediaPlayer.cpp
+ * When JavaScript creates a `var ms = new MediaSource()` then creates a URL
+ * with that source `URL.createObjectURL(ms)`. When this MediaSource gets
+ * assigned to the video.src attribute, MediaPlayerPrivateHelio::load
+ * is called with the url of the domain creating the URL.
+ * MediaPlayerPrivateHelio is chosen by first calling it's _supportsType function.
+ * During the load function the MediaPlayerPrivateHelio creates
+ * a MediaSourcePrivateHelio, passing itself & the MediaSourcePrivateClient
+ * it receives in the load function. MediaSourcePrivateHelio then uses the
+ * client to call setPrivateAndOpen with a reference to itself. This dispatches
+ * the `sourceopen` event at the MediaSource object created earlier.
+ *
+ * Once the sourceopen event fires, a JavaScript player typically creates
+ * a SourceBuffer by calling `addSourceBuffer` of the `MediaSource`, which
+ * in this case uses our MediaSourcePrivateHelio that was set as the private
+ * of the MediaSource earlier. MediaSourcePrivateHelio's addSourceBuffer
+ * creates a SourceBufferPrivateHelio object which gets returned to the
+ * MediaSource. MediaSource then creates a SourceBuffer object, passing it
+ * a reference to the SourceBufferPrivateHelio, SourceBuffer then calls it's
+ * private reference setting itself as the client.
+ *
+ * Once JavaScript has a SourceBuffer object, is can begin to append data.
+ * The append call proxy's through the SourceBuffer to the
+ * SourceBufferPrivateHelio, once the data has been demuxed, the private
+ * notify's the client that it first found an initialization segment,
+ * which includes metadata about the demuxed data. Then beings providing samples
+ * for that metadata. When it's done with the provided data it calls the clients
+ * sourceBufferPrivateAppendComplete which causes the updatend event to fire.
+ *
+ *
+ *
+ */
+
+
 namespace WebCore {
 
 class MediaSourcePrivateHelio;

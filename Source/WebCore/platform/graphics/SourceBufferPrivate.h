@@ -50,6 +50,7 @@ public:
     virtual void setClient(SourceBufferPrivateClient*) = 0;
 
     virtual void append(const unsigned char* data, unsigned length) = 0;
+    // NOTE(estobb200): Not used.
     virtual void appendComplete(SourceBufferPrivateClient::AppendResult) { };
     virtual void abort() = 0;
     virtual void resetParserState() = 0;
@@ -62,9 +63,13 @@ public:
     virtual void enqueueSample(PassRefPtr<MediaSample>, AtomicString) { }
     virtual bool isReadyForMoreSamples(AtomicString) { return false; }
     virtual void setActive(bool) { }
+#if USE(GSTREAMER)
     virtual void stopAskingForMoreSamples(AtomicString) { }
+#endif
     virtual void notifyClientWhenReadyForMoreSamples(AtomicString) { }
 
+    // NOTE(estobb200): Appears to only be used in testing purposes
+    // and overriden by the MockPrivate
     virtual Vector<String> enqueuedSamplesForTrackID(AtomicString) { return {}; }
 };
 

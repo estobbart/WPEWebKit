@@ -3,16 +3,16 @@
 
 #include "SourceBufferPrivate.h"
 
+#include "helio.h"
+#include "demux/track.h"
+#include "demux/sample.h"
+
 namespace WebCore {
 
 class MediaSourcePrivateHelio;
 
 class SourceBufferPrivateHelio final : public SourceBufferPrivate {
 public:
-    // SourceBufferPrivateHelio();
-    //static RefPtr<MockSourceBufferPrivate> create(MockMediaSourcePrivate*);
-    //static Ref<SourceBufferPrivateGStreamer> create(MediaSourceGStreamer*, Ref<MediaSourceClientGStreamerMSE>, const ContentType&);
-    //static RefPtr<SourceBufferPrivateAVFObjC> create(MediaSourcePrivateAVFObjC*);
     static RefPtr<SourceBufferPrivateHelio> create(MediaSourcePrivateHelio*);
     ~SourceBufferPrivateHelio();
 
@@ -25,11 +25,44 @@ public:
 
     MediaPlayer::ReadyState readyState() const override;
     void setReadyState(MediaPlayer::ReadyState) override;
+
+    // Called by the SourceBuffer during reenqueueMediaForTime
+    void flush(AtomicString) override;
+
+    // Called by the SourceBuffer during provideMediaData after
+    // it checks if we're ready for more samples, and we return true.
+    void enqueueSample(PassRefPtr<MediaSample>, AtomicString) override;
+
+    // Called by the SourceBuffer during provideMediaData before calling
+    // enqueueSample. provideMediaData generally occurs as soon as the
+    // SoureBufferPrivate notifies it's client that it is done via the
+    // sourceBufferPrivateAppendComplete method of the client.
+    bool isReadyForMoreSamples(AtomicString) override;
+
+    // Called by the SourceBuffer when it's own active flag gets set,
+    // which seems to be tied to track changes, or after the initialization
+    // segment is returned to the client.
+    void setActive(bool) override;
+
+    // Called by the SourceBuffer during provideMediaData after
+    // it checks if we're ready for more samples, and we return false.
+    void notifyClientWhenReadyForMoreSamples(AtomicString) override;
+
+// TODO: Is there a way to hide these?
+    void trackInfoEventHandler(helio_track_t * tracks, uint8_t track_count);
+
+    void mediaSampleEventHandler(helio_sample_t *sample);
+
+    void demuxCompleteEventHandler();
+
 private:
+
     explicit SourceBufferPrivateHelio(MediaSourcePrivateHelio*);
     MediaPlayer::ReadyState m_readyState;
 
     SourceBufferPrivateClient* m_client;
+    helio_t *m_helio;
+
 };
 }
 

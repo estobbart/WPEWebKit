@@ -52,7 +52,7 @@ std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> MediaSampleHelio::divide(con
 
 Ref<MediaSample> MediaSampleHelio::createNonDisplayingCopy() const {
     printf("createNonDisplayingCopy\n");
-    return MediaSampleHelio::create();
+    return MediaSampleHelio::create(m_sample);
 }
 
 MediaSample::SampleFlags MediaSampleHelio::flags() const {
