@@ -5995,6 +5995,7 @@
 		D2AC951C1EF721CE005588A4 /* SourceBufferPrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */; };
 		D2AC951D1EF721D1005588A4 /* SourceBufferPrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */; };
 		D2F95A681F06B06200979D5B /* Proxy.h in Headers */ = {isa = PBXBuildFile; fileRef = D2F95A671F06B05600979D5B /* Proxy.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		D2FEE6F41F0B1E0400D28CCE /* libhelio.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D2FEE6F31F0B1E0400D28CCE /* libhelio.a */; };
 		D302754912A5FE84004BD828 /* RenderDetailsMarker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D302754512A5FE84004BD828 /* RenderDetailsMarker.cpp */; };
 		D302754A12A5FE84004BD828 /* RenderDetailsMarker.h in Headers */ = {isa = PBXBuildFile; fileRef = D302754612A5FE84004BD828 /* RenderDetailsMarker.h */; };
 		D359D789129CA2710006E5D2 /* HTMLDetailsElement.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D359D786129CA2710006E5D2 /* HTMLDetailsElement.cpp */; };
@@ -13907,6 +13908,7 @@
 		D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SourceBufferPrivateHelio.cpp; path = helio/SourceBufferPrivateHelio.cpp; sourceTree = "<group>"; };
 		D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = SourceBufferPrivateHelio.h; path = helio/SourceBufferPrivateHelio.h; sourceTree = "<group>"; };
 		D2F95A671F06B05600979D5B /* Proxy.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Proxy.h; sourceTree = "<group>"; };
+		D2FEE6F31F0B1E0400D28CCE /* libhelio.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libhelio.a; path = ../../../libhelio/build/lib/libhelio.a; sourceTree = "<group>"; };
 		D302754512A5FE84004BD828 /* RenderDetailsMarker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = RenderDetailsMarker.cpp; sourceTree = "<group>"; };
 		D302754612A5FE84004BD828 /* RenderDetailsMarker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RenderDetailsMarker.h; sourceTree = "<group>"; };
 		D359D786129CA2710006E5D2 /* HTMLDetailsElement.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = HTMLDetailsElement.cpp; sourceTree = "<group>"; };
@@ -14892,6 +14894,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D2FEE6F41F0B1E0400D28CCE /* libhelio.a in Frameworks */,
 				FD2DBF1212B048A300ED98C6 /* Accelerate.framework in Frameworks */,
 				FD2DBF1312B048A300ED98C6 /* AudioToolbox.framework in Frameworks */,
 				1AB33DA512551E320024457A /* IOKit.framework in Frameworks */,
@@ -15361,6 +15364,7 @@
 		0867D69AFE84028FC02AAC07 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				D2FEE6F31F0B1E0400D28CCE /* libhelio.a */,
 				FD2DBF0E12B048A300ED98C6 /* Accelerate.framework */,
 				FD2DBF0F12B048A300ED98C6 /* AudioToolbox.framework */,
 				AA5F3B9016CC5BEB00455EB0 /* CoreFoundation.framework */,
@@ -28491,7 +28495,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/DerivedSources/WebCore\"\ncd \"${BUILT_PRODUCTS_DIR}/DerivedSources/WebCore\"\n\n/bin/ln -sf \"${SRCROOT}\" WebCore\nexport WebCore=\"WebCore\"\n/bin/ln -sf \"${JAVASCRIPTCORE_PRIVATE_HEADERS_DIR}\" JavaScriptCorePrivateHeaders\nexport JavaScriptCore_SCRIPTS_DIR=\"JavaScriptCorePrivateHeaders\"\n\nif [ ! $CC ]; then\n    export CC=\"`xcrun -find clang`\"\nfi\n\nif [ ! $GPERF ]; then\n    export GPERF=\"`xcrun -find gperf`\"\nfi\n\nMAKEFILE_INCLUDE_FLAGS=$(echo \"${WEBKITADDITIONS_HEADER_SEARCH_PATHS}\" | perl -e 'print \"-I\" . join(\" -I\", split(\" \", <>));')\n\nif [ \"${ACTION}\" = \"build\" -o \"${ACTION}\" = \"install\" -o \"${ACTION}\" = \"installhdrs\" -o \"${ACTION}\" = \"installapi\" ]; then\nmake --no-builtin-rules ${MAKEFILE_INCLUDE_FLAGS} -f \"WebCore/DerivedSources.make\" -j `/usr/sbin/sysctl -n hw.activecpu` SDKROOT=\"${SDKROOT}\"\nfi\n";
+			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/DerivedSources/WebCore\"\ncd \"${BUILT_PRODUCTS_DIR}/DerivedSources/WebCore\"\n\n/bin/ln -sfh \"${SRCROOT}\" WebCore\nexport WebCore=\"WebCore\"\n/bin/ln -sfh \"${JAVASCRIPTCORE_PRIVATE_HEADERS_DIR}\" JavaScriptCorePrivateHeaders\nexport JavaScriptCore_SCRIPTS_DIR=\"JavaScriptCorePrivateHeaders\"\n\nif [ ! $CC ]; then\n    export CC=\"`xcrun -find clang`\"\nfi\n\nif [ ! $GPERF ]; then\n    export GPERF=\"`xcrun -find gperf`\"\nfi\n\nMAKEFILE_INCLUDE_FLAGS=$(echo \"${WEBKITADDITIONS_HEADER_SEARCH_PATHS}\" | perl -e 'print \"-I\" . join(\" -I\", split(\" \", <>));')\n\nif [ \"${ACTION}\" = \"build\" -o \"${ACTION}\" = \"install\" -o \"${ACTION}\" = \"installhdrs\" -o \"${ACTION}\" = \"installapi\" ]; then\nmake --no-builtin-rules ${MAKEFILE_INCLUDE_FLAGS} -f \"WebCore/DerivedSources.make\" -j `/usr/sbin/sysctl -n hw.activecpu` SDKROOT=\"${SDKROOT}\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -31767,6 +31771,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1CDD45E50BA9C84600F90147 /* WebCore.xcconfig */;
 			buildSettings = {
+				LIBRARY_SEARCH_PATHS = /Users/estobb200/Development/libhelio/build/lib;
+				USER_HEADER_SEARCH_PATHS = /Users/estobb200/Development/libhelio/include;
 			};
 			name = Debug;
 		};
@@ -31774,6 +31780,8 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1CDD45E50BA9C84600F90147 /* WebCore.xcconfig */;
 			buildSettings = {
+				LIBRARY_SEARCH_PATHS = /Users/estobb200/Development/libhelio/build/lib;
+				USER_HEADER_SEARCH_PATHS = /Users/estobb200/Development/libhelio/include;
 			};
 			name = Release;
 		};
@@ -31782,6 +31790,8 @@
 			baseConfigurationReference = 1CDD45E50BA9C84600F90147 /* WebCore.xcconfig */;
 			buildSettings = {
 				BUILD_VARIANTS = normal;
+				LIBRARY_SEARCH_PATHS = /Users/estobb200/Development/libhelio/build/lib;
+				USER_HEADER_SEARCH_PATHS = /Users/estobb200/Development/libhelio/include;
 			};
 			name = Production;
 		};

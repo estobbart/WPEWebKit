@@ -6,6 +6,7 @@
 #include "MediaDescription.h"
 //#include "InbandTextTrackPrivate.h"
 
+
 #include <stdio.h>
 #include <string.h> // memcpy
 
@@ -13,7 +14,7 @@ namespace WebCore {
 
 class MediaDescriptionHelio final : public MediaDescription {
 public:
-    static RefPtr<MediaDescriptionHelio> create() { return adoptRef(new MediaDescriptionHelio()); }
+    static RefPtr<MediaDescriptionHelio> create(helio_track_t *track) { return adoptRef(new MediaDescriptionHelio(track)); }
     virtual ~MediaDescriptionHelio() { }
 
     AtomicString codec() const override { return m_codec; }
@@ -22,10 +23,10 @@ public:
     bool isText() const override { return m_isText; }
 
 protected:
-    MediaDescriptionHelio()
-        /*: m_isVideo([track hasMediaCharacteristic:AVMediaCharacteristicVisual])
-        , m_isAudio([track hasMediaCharacteristic:AVMediaCharacteristicAudible])
-        , m_isText([track hasMediaCharacteristic:AVMediaCharacteristicLegible])*/
+    MediaDescriptionHelio(helio_track_t *track)
+        : m_isVideo(track->type == hve_track_video)
+        , m_isAudio(track->type == hve_track_audio)
+        , m_isText(track->type == hve_track_text)
     {
         // NSArray* formatDescriptions = [track formatDescriptions];
         // CMFormatDescriptionRef description = [formatDescriptions count] ? (CMFormatDescriptionRef)[formatDescriptions objectAtIndex:0] : 0;
@@ -33,6 +34,7 @@ protected:
         //     FourCharCode codec = CMFormatDescriptionGetMediaSubType(description);
         //     m_codec = AtomicString(reinterpret_cast<LChar*>(&codec), 4);
         // }
+        m_codec = AtomicString(track->codec);
     }
 
     AtomicString m_codec;
@@ -41,17 +43,58 @@ protected:
     bool m_isText;
 };
 
-// To callback from receiving an avpacket..
 
-// TOOD: by default we want these callbacks to happen on the helio thread?
-// Or on the main thread?
+// TODO: Move all these to calls on the main thread..
+static void hve_ready_handler(void *sourceBufferPrivate __attribute__((unused)),
+                                void *event_data __attribute__((unused))) {
+    printf("helio_ready_handler\n");
+}
 
+static void hve_track_info_handler(void *sourceBufferPrivate, void *event_data) {
+    printf("hve_track_info_handler\n");
+    SourceBufferPrivateHelio *sbHelio = (SourceBufferPrivateHelio *)sourceBufferPrivate;
+    helio_track_info_t * track_info = (helio_track_info_t *)event_data;
+    helio_track_t * tracks = (helio_track_t *)malloc(sizeof(helio_track_t) * track_info->track_count);
+    uint8_t idx = 0;
+    for (;idx < track_info->track_count; idx++) {
+        memcpy(&track_info->tracks, &tracks[idx], sizeof(helio_track_t));
+        track_info->tracks++;
+    }
+    callOnMainThread([sbHelio, tracks, idx] {
+        if (sbHelio) {
+            sbHelio->trackInfoEventHandler(tracks, idx);
+        }
+        free(tracks);
 
-// if (m_client) {
-//     Ref<MediaSample> mediaSample = MediaSampleAVFObjC::create(sampleBuffer, trackID);
-//     LOG(MediaSourceSamples, "SourceBufferPrivateAVFObjC::processCodedFrame(%p) - sample(%s)", this, toString(mediaSample.get()).utf8().data());
-//     m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
-// }
+    });
+}
+
+static void hve_media_sample_handler(void *sourceBufferPrivate, void *event_data) {
+    //printf("hve_media_sample_handler\n");
+    SourceBufferPrivateHelio *sbHelio = (SourceBufferPrivateHelio *)sourceBufferPrivate;
+    helio_sample_t * sample = (helio_sample_t *)malloc(sizeof(helio_sample_t));
+    memcpy(event_data, sample, sizeof(helio_sample_t));
+    callOnMainThread([sbHelio, sample] {
+        if (sbHelio) {
+            sbHelio->mediaSampleEventHandler(sample);
+        }
+    });
+}
+
+static void hve_demux_start_handler(void *sourceBufferPrivate __attribute__((unused)),
+                                    void *event_data __attribute__((unused))) {
+    printf("hve_demux_start_handler\n");
+}
+
+static void hve_demux_complete_handler(void *sourceBufferPrivate,
+                                       void *event_data __attribute__((unused))) {
+    printf("hve_demux_complete_handler\n");
+    SourceBufferPrivateHelio *sbHelio = (SourceBufferPrivateHelio *)sourceBufferPrivate;
+    callOnMainThread([sbHelio] {
+        if (sbHelio)
+            sbHelio->demuxCompleteEventHandler();
+    });
+}
 
 RefPtr<SourceBufferPrivateHelio> SourceBufferPrivateHelio::create(MediaSourcePrivateHelio* parent) {
     printf("SourceBufferPrivateHelio create\n");
@@ -61,10 +104,25 @@ RefPtr<SourceBufferPrivateHelio> SourceBufferPrivateHelio::create(MediaSourcePri
 SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaSourcePrivateHelio* parent __attribute__((unused)))
   : m_readyState(MediaPlayer::HaveNothing) {
       printf("SourceBufferPrivateHelio constructor\n");
+      // TODO: Fix this in helio..
+      static const hve_event_callback_t callbacks[] = {
+        { hve_ready_event,  hve_ready_handler },
+        { hve_track_info_event,  hve_track_info_handler },
+        { hve_media_sample_event, hve_media_sample_handler },
+        { hve_demux_start_event, hve_demux_start_handler },
+        { hve_demux_complete_event, hve_demux_complete_handler },
+        { NULL, NULL }
+      };
+      if (!m_helio) {
+          m_helio = helio_init(this, callbacks);
+      }
 }
 
 SourceBufferPrivateHelio::~SourceBufferPrivateHelio() {
     printf("SourceBufferPrivateHelio destructor\n");
+    if (m_helio) {
+        helio_destroy(m_helio);
+    }
 }
 
 void SourceBufferPrivateHelio::setClient(SourceBufferPrivateClient* client) {
@@ -81,8 +139,14 @@ void SourceBufferPrivateHelio::setClient(SourceBufferPrivateClient* client) {
  * initialization data, Track ID mappings for multiplexed segments, and
  * timestamp offsets (e.g. edit lists).
  */
-void SourceBufferPrivateHelio::append(const unsigned char* data __attribute__((unused)), unsigned length) {
+void SourceBufferPrivateHelio::append(const unsigned char* data,
+                                      unsigned length) {
     printf("SourceBufferPrivateHelio append size:%i\n", length);
+
+    helio_enque_data(m_helio, data, length);
+
+
+
   // TODO: SourceBuffer has a ifdef GSTREAMER wrapper around quota exceeded error
   // buffer size is also defined in SourceBuffer, should be a private implementation
 
@@ -91,103 +155,22 @@ void SourceBufferPrivateHelio::append(const unsigned char* data __attribute__((u
   // demuxing the data..
 
 
-  // TODO: You must first call
-  // sourceBufferPrivateDidReceiveInitializationSegment
-  // or you get an appendError
-
-  /*
-
-  struct InitializationSegment {
-      MediaTime duration;
-
-      struct AudioTrackInformation {
-          RefPtr<MediaDescription> description;
-          RefPtr<AudioTrackPrivate> track;
-      };
-      Vector<AudioTrackInformation> audioTracks;
-
-      struct VideoTrackInformation {
-          RefPtr<MediaDescription> description;
-          RefPtr<VideoTrackPrivate> track;
-      };
-      Vector<VideoTrackInformation> videoTracks;
-
-      struct TextTrackInformation {
-          RefPtr<MediaDescription> description;
-          RefPtr<InbandTextTrackPrivate> track;
-      };
-      Vector<TextTrackInformation> textTracks;
-  };
-  virtual void sourceBufferPrivateDidReceiveInitializationSegment(SourceBufferPrivate*, const InitializationSegment&) = 0;
+  //     return;
+  // }
 
 
-  */
+  // if (m_client) {
+  //     Ref<MediaSample> mediaSample = MediaSampleHelio::create();
+  //     //LOG(MediaSourceSamples, "SourceBufferPrivateAVFObjC::processCodedFrame(%p) - sample(%s)", this, toString(mediaSample.get()).utf8().data());
+  //     m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
+  // }
 
-  static int once = 0;
-  if (!once) {
-      once++;
-      SourceBufferPrivateClient::InitializationSegment segment;
-      segment.duration = MediaTime(); //TODO:
-
-      SourceBufferPrivateClient::InitializationSegment::VideoTrackInformation vtInfo;
-      vtInfo.track = VideoTrackPrivate::create(); // TODO:
-      vtInfo.description = MediaDescriptionHelio::create(); // TODO:
-
-      segment.videoTracks.append(vtInfo);
-
-      SourceBufferPrivateClient::InitializationSegment::AudioTrackInformation atInfo;
-      atInfo.track = AudioTrackPrivate::create(); // TODO:
-      atInfo.description = MediaDescriptionHelio::create(); // TODO:
-
-      segment.audioTracks.append(atInfo);
-
-      SourceBufferPrivateClient::InitializationSegment::TextTrackInformation ttInfo;
-      /*
-      enum CueFormat {
-          Data,
-          Generic,
-          WebVTT
-      };
-      */
-      ttInfo.track = InbandTextTrackPrivate::create(InbandTextTrackPrivate::CueFormat::Generic); // TODO:
-      ttInfo.description = MediaDescriptionHelio::create(); // TODO:
-
-      segment.textTracks.append(ttInfo);
-
-      m_client->sourceBufferPrivateDidReceiveInitializationSegment(this, segment);
-
-
-      return;
-  }
-
-
-  if (m_client) {
-      Ref<MediaSample> mediaSample = MediaSampleHelio::create();
-      //LOG(MediaSourceSamples, "SourceBufferPrivateAVFObjC::processCodedFrame(%p) - sample(%s)", this, toString(mediaSample.get()).utf8().data());
-      m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
-  }
-
-
-
-
-  if (m_client) {
-      m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::AppendSucceeded);
-  }
-  // if (m_client)
-  //     m_client->sourceBufferPrivateAppendComplete(this, didSuccessfullyParse ? SourceBufferPrivateClient::AppendSucceeded : SourceBufferPrivateClient::ParsingFailed);
 }
 
 void SourceBufferPrivateHelio::abort() {
     printf("SourceBufferPrivateHelio abort\n");
 }
 
-/*
-1   com.apple.WebCore             	0x000000010c664cbd WebCore::SourceBufferPrivateHelio::resetParserState() + 45
-2   com.apple.WebCore             	0x000000010c080d33 WebCore::SourceBuffer::resetParserState() + 435 (SourceBuffer.cpp:272)
-3   com.apple.WebCore             	0x000000010c08523f WebCore::SourceBuffer::appendError(bool) + 95 (SourceBuffer.cpp:1401)
-4   com.apple.WebCore             	0x000000010c08ab7b WebCore::SourceBuffer::sourceBufferPrivateDidReceiveSample(WebCore::SourceBufferPrivate*, WebCore::MediaSample&) + 123 (SourceBuffer.cpp:1427)
-5   com.apple.WebCore             	0x000000010c08d0b4 non-virtual thunk to WebCore::SourceBuffer::sourceBufferPrivateDidReceiveSample(WebCore::SourceBufferPrivate*, WebCore::MediaSample&) + 52 (SourceBuffer.cpp:1414)
-*/
 void SourceBufferPrivateHelio::resetParserState() {
     printf("SourceBufferPrivateHelio resetParserState\n");
 }
@@ -205,5 +188,113 @@ void SourceBufferPrivateHelio::setReadyState(MediaPlayer::ReadyState readyState)
     printf("SourceBufferPrivateHelio setReadyState:%i\n", readyState);
     m_readyState = readyState;
 }
+
+void SourceBufferPrivateHelio::flush(AtomicString as) {
+    printf("SourceBufferPrivateHelio flush:%s\n", as.string().utf8().data());
+}
+
+void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample>, AtomicString as) {
+    printf("SourceBufferPrivateHelio enqueueSample:%s\n", as.string().utf8().data());
+}
+
+bool SourceBufferPrivateHelio::isReadyForMoreSamples(AtomicString as) {
+    printf("SourceBufferPrivateHelio isReadyForMoreSamples:%s ", as.string().utf8().data());
+    static bool isReady = false;
+    isReady = !isReady;
+    printf("%i\n", isReady);
+    return isReady;
+}
+
+void SourceBufferPrivateHelio::setActive(bool active) {
+    printf("SourceBufferPrivateHelio setActive:%i\n", active);
+}
+
+void SourceBufferPrivateHelio::notifyClientWhenReadyForMoreSamples(AtomicString as) {
+    printf("SourceBufferPrivateHelio notifyClientWhenReadyForMoreSamples:%s\n", as.string().utf8().data());
+}
+
+void SourceBufferPrivateHelio::trackInfoEventHandler(helio_track_t * tracks, uint8_t track_count) {
+    printf("SourceBufferPrivateHelio trackInfoEventHandler\n");
+
+    /**
+     * We first must report an InitializationSegment prior to reporting
+     * samples, or appendError gets called.
+     * https://www.w3.org/TR/media-source/#sourcebuffer-init-segment-received
+     * https://www.w3.org/TR/media-source/#init-segment
+     *
+     * A Segment has four attributes..
+     *  it's duration,
+     *  a vector of audioTrack information,
+     *  a vector of videoTracks information,
+     *  and a vector of textTrack information.
+     *
+     *  within those information vectors includes MediaDescription, and
+     *  a trackPrivate ref.
+     *
+     * A MediaDescription includes an AtomicString of the codec for the track
+     * and a bool to determine if the track is audio, video, or text.
+     *
+     * The *TrackPrivate ref, is somewhat dumb, and doesn't carry much
+     * information with it.
+     *
+     */
+    SourceBufferPrivateClient::InitializationSegment segment;
+    segment.duration = MediaTime(); //TODO: duration of what? the data received?
+
+    uint8_t idx = 0;
+    for (;idx < track_count; idx++) {
+        if (tracks[idx].type == hve_track_video) {
+            printf("hve_track_info_handler hve_track_video\n");
+            SourceBufferPrivateClient::InitializationSegment::VideoTrackInformation vtInfo;
+            vtInfo.track = VideoTrackPrivate::create(); // TODO:
+            vtInfo.description = MediaDescriptionHelio::create(&tracks[idx]); // TODO:
+
+            segment.videoTracks.append(vtInfo);
+        } else if (tracks[idx].type == hve_track_audio) {
+            printf("hve_track_info_handler hve_track_audio\n");
+            SourceBufferPrivateClient::InitializationSegment::AudioTrackInformation atInfo;
+            atInfo.track = AudioTrackPrivate::create(); // TODO:
+            atInfo.description = MediaDescriptionHelio::create(&tracks[idx]); // TODO:
+
+            segment.audioTracks.append(atInfo);
+        }
+         // TODO:
+         // SourceBufferPrivateClient::InitializationSegment::TextTrackInformation ttInfo;
+         // /*
+         // enum CueFormat {
+         //     Data,
+         //     Generic,
+         //     WebVTT
+         // };
+         // */
+         // ttInfo.track = InbandTextTrackPrivate::create(InbandTextTrackPrivate::CueFormat::Generic); // TODO:
+         // ttInfo.description = MediaDescriptionHelio::create(); // TODO:
+         //
+         // segment.textTracks.append(ttInfo);
+
+        tracks++;
+    }
+
+    if (m_client) {
+        m_client->sourceBufferPrivateDidReceiveInitializationSegment(this, segment);
+    }
+}
+
+void SourceBufferPrivateHelio::mediaSampleEventHandler(helio_sample_t *sample) {
+    //printf("SourceBufferPrivateHelio mediaSampleEventHandler\n");
+    if (m_client) {
+        Ref<MediaSample> mediaSample = MediaSampleHelio::create(sample);
+        m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
+    }
+}
+
+void SourceBufferPrivateHelio::demuxCompleteEventHandler() {
+    printf("SourceBufferPrivateHelio demuxCompleteEventHandler\n");
+    if (m_client) {
+        // TODO: Or SourceBufferPrivateClient::ParsingFailed
+        m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::AppendSucceeded);
+    }
+}
+
 
 }

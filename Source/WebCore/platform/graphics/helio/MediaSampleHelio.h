@@ -2,8 +2,10 @@
 #define MediaSampleHelio_H
 
 #include "MediaSample.h"
+#include "demux/sample.h" // libhelio
 
-// TODO: include helio
+#include <stdio.h>
+
 // TODO: Read up on this..
 
 // https://developer.apple.com/documentation/coremedia/cmsamplebuffer?language=objc
@@ -13,10 +15,15 @@ namespace WebCore {
 class MediaSampleHelio final : public MediaSample {
 
 public:
-    static Ref<MediaSampleHelio> create() { return adoptRef(*new MediaSampleHelio()); }
+    static Ref<MediaSampleHelio> create(helio_sample_t *sample) {
+        return adoptRef(*new MediaSampleHelio(sample));
+    }
 
 private:
-    MediaSampleHelio() {}
+    MediaSampleHelio(helio_sample_t *sample) {
+        m_sample = sample;
+        m_id = AtomicString::number(m_sample->track_id);
+    }
 
     virtual ~MediaSampleHelio() { }
 
@@ -24,8 +31,13 @@ private:
     MediaTime decodeTime() const override;
     MediaTime duration() const override;
 
-    AtomicString trackID() const override { return m_id; }
-    void setTrackID(const String& id) override { m_id = id; }
+    AtomicString trackID() const override {
+        printf("MediaSampleHelio::trackID %s \n", m_id.string().utf8().data());
+        return m_id;
+    }
+    void setTrackID(const String& id) override {
+        m_id = id;
+    }
 
     size_t sizeInBytes() const override;
     // it's width, height if video
@@ -44,6 +56,8 @@ private:
 
     // RetainPtr<CMSampleBufferRef> m_sample;
     AtomicString m_id;
+
+    helio_sample_t *m_sample;
 };
 
 }
