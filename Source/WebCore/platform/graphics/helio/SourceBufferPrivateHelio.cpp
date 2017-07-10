@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h> // memcpy
 
+#import <wtf/MainThread.h>
+
 namespace WebCore {
 
 class MediaDescriptionHelio final : public MediaDescription {
