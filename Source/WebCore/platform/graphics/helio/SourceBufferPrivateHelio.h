@@ -27,10 +27,15 @@ public:
     void setReadyState(MediaPlayer::ReadyState) override;
 
     // Called by the SourceBuffer during reenqueueMediaForTime
+    // TODO: (estobb200): Need to undersatnd the usage of this function better
     void flush(AtomicString) override;
 
     // Called by the SourceBuffer during provideMediaData after
     // it checks if we're ready for more samples, and we return true.
+    // As soon as a sample is enqueued, it is erased from the decodeQueue
+    // of the trackBuffer. NOTE(estobb200): At this point the memory
+    // pointed to by the MediaSample shold be considered owned by libhelio
+    // again.
     void enqueueSample(PassRefPtr<MediaSample>, AtomicString) override;
 
     // Called by the SourceBuffer during provideMediaData before calling
@@ -48,7 +53,7 @@ public:
     // it checks if we're ready for more samples, and we return false.
     void notifyClientWhenReadyForMoreSamples(AtomicString) override;
 
-// TODO: Is there a way to hide these?
+    // TODO: Is there a better way to hide these?
     void trackInfoEventHandler(helio_track_t * tracks, uint8_t track_count);
 
     void mediaSampleEventHandler(helio_sample_t *sample);
