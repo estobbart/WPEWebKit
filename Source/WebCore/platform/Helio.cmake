@@ -46,3 +46,14 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
     )
 
 endif ()
+
+if (USE_HOLE_PUNCH_EXTERNAL)
+    list(APPEND WebCore_SOURCES
+        platform/graphics/holepunch/MediaPlayerPrivateHolePunchBase.cpp
+        platform/graphics/holepunch/MediaPlayerPrivateHolePunchDummy.cpp
+    )
+
+    list(APPEND WebCore_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/platform/graphics/holepunch"
+    )
+endif ()
