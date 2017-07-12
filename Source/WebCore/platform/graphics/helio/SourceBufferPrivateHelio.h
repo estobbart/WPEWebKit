@@ -23,6 +23,7 @@ public:
     void resetParserState() override;
     void removedFromMediaSource() override;
 
+    //     enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
     MediaPlayer::ReadyState readyState() const override;
     void setReadyState(MediaPlayer::ReadyState) override;
 

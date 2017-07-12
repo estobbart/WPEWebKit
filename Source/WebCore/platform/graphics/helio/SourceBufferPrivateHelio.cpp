@@ -201,10 +201,10 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample>, AtomicStri
 
 bool SourceBufferPrivateHelio::isReadyForMoreSamples(AtomicString as) {
     printf("SourceBufferPrivateHelio isReadyForMoreSamples:%s ", as.string().utf8().data());
-    static bool isReady = false;
-    isReady = !isReady;
-    printf("%i\n", isReady);
-    return isReady;
+    // static bool isReady = false;
+    // isReady = !isReady;
+    // printf("%i\n", isReady);
+    return true;
 }
 
 void SourceBufferPrivateHelio::setActive(bool active) {
