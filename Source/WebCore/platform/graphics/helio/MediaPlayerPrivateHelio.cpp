@@ -157,6 +157,7 @@ std::unique_ptr<PlatformTimeRanges> MediaPlayerPrivateHelio::buffered() const {
 }
 
 bool MediaPlayerPrivateHelio::didLoadingProgress() const {
+    // TODO: Does this determine when "open" dispatches?
     // printf("MediaPlayerPrivateHelio didLoadingProgress\n");
     // this after being constructed this gets called repeatedly, if you return true, it calls visible and setSize
     return true;

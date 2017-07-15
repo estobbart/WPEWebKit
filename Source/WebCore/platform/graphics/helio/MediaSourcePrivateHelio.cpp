@@ -35,6 +35,12 @@ MediaSourcePrivate::AddStatus MediaSourcePrivateHelio::addSourceBuffer(const Con
                                                                        RefPtr<SourceBufferPrivate>& sourceBufferPrivate) {
   // enum AddStatus { Ok, NotSupported, ReachedIdLimit };
 
+  // This could be pased to the helio engine to init a pipeline..
+
+// H.264 Baseline: avc1.42E0xx, where xx is the AVC level
+// H.264 Main: avc1.4D40xx, where xx is the AVC level
+// H.264 High: avc1.6400xx, where xx is the AVC level
+
   printf("MediaSourcePrivateHelio addSourceBuffer contentType:%s\n", contentType.type().utf8().data());
   // TODO: Would mean exposing _supportsType from MediaPlayerPrivateHelio
   // Doesn't really make much sense to check again here unless we got the codec

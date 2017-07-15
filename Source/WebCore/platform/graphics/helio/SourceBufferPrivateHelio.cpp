@@ -292,7 +292,7 @@ void SourceBufferPrivateHelio::trackInfoEventHandler(const SourceBufferPrivateCl
 void SourceBufferPrivateHelio::mediaSampleEventHandler(helio_sample_t **samples) {
     // printf("SourceBufferPrivateHelio mediaSampleEventHandler\n");
     if (m_client) {
-        while (samples != NULL) {
+        while (*samples != NULL) {
             Ref<MediaSample> mediaSample = MediaSampleHelio::create(*samples);
             m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
             samples++;
