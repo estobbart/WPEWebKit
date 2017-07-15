@@ -55,9 +55,9 @@ public:
     void notifyClientWhenReadyForMoreSamples(AtomicString) override;
 
     // TODO: Is there a better way to hide these?
-    void trackInfoEventHandler(helio_track_t * tracks, uint8_t track_count);
+    void trackInfoEventHandler(const SourceBufferPrivateClient::InitializationSegment& segment);
 
-    void mediaSampleEventHandler(helio_sample_t *sample);
+    void mediaSampleEventHandler(helio_sample_t **samples);
 
     void demuxCompleteEventHandler();
 
@@ -68,6 +68,7 @@ private:
 
     SourceBufferPrivateClient* m_client;
     helio_t *m_helio;
+    //HashMap<AtomicString, bool> m_trackNotifyMap;
 
 };
 }

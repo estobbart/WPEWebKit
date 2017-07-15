@@ -22,6 +22,7 @@ public:
 private:
     MediaSampleHelio(helio_sample_t *sample) {
         m_sample = sample;
+        //m_id = AtomicString(String::format("%i", m_sample->track_id));
         m_id = AtomicString::number(m_sample->track_id);
     }
 
@@ -32,7 +33,7 @@ private:
     MediaTime duration() const override;
 
     AtomicString trackID() const override {
-        printf("MediaSampleHelio::trackID %s \n", m_id.string().utf8().data());
+        //printf("MediaSampleHelio::trackID %s \n", m_id.string().utf8().data());
         return m_id;
     }
     void setTrackID(const String& id) override {

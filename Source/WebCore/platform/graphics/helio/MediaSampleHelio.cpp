@@ -3,27 +3,33 @@
 
 #import <wtf/PrintStream.h>
 
+/**
+ * presentationTime
+ * decodeTime
+ * duration
+ */
+
 namespace WebCore {
 
 MediaTime MediaSampleHelio::presentationTime() const {
-    printf("presentationTime\n");
-    return MediaTime();
+    // printf("presentationTime\n");
+    return MediaTime::createWithDouble(m_sample->pts * m_sample->scale);
     //return toMediaTime(CMSampleBufferGetPresentationTimeStamp(m_sample.get()));
 }
 
 MediaTime MediaSampleHelio::decodeTime() const {
-    printf("decodeTime\n");
-    return MediaTime();
+    // printf("decodeTime\n");
+    return MediaTime::createWithDouble(m_sample->pts * m_sample->scale);
 }
 
 MediaTime MediaSampleHelio::duration() const {
-    printf("duration\n");
-    return MediaTime();
+    // printf("duration\n");
+    return MediaTime::createWithDouble(m_sample->duration * m_sample->scale);
 }
 
 size_t MediaSampleHelio::sizeInBytes() const {
     printf("sizeInBytes\n");
-    return 0;
+    return m_sample->size;
 }
 
 FloatSize MediaSampleHelio::presentationSize() const {
@@ -57,7 +63,15 @@ Ref<MediaSample> MediaSampleHelio::createNonDisplayingCopy() const {
 
 MediaSample::SampleFlags MediaSampleHelio::flags() const {
     printf("flags\n");
-    return MediaSample::None;
+    // TODO: It's unclear what this IsSync means
+    /*
+    enum SampleFlags {
+        None = 0,
+        IsSync = 1 << 0,
+        IsNonDisplaying = 1 << 1,
+    };
+    */
+    return MediaSample::IsSync;
 }
 
 PlatformSample MediaSampleHelio::platformSample() {
