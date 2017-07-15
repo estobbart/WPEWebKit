@@ -5986,8 +5986,12 @@
 		D0EDA775143E303C0028E383 /* CachedRawResource.h in Headers */ = {isa = PBXBuildFile; fileRef = D0EDA773143E303C0028E383 /* CachedRawResource.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		D0FF2A5D11F8C45A007E74E0 /* PingLoader.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D0FF2A5B11F8C45A007E74E0 /* PingLoader.cpp */; };
 		D0FF2A5E11F8C45A007E74E0 /* PingLoader.h in Headers */ = {isa = PBXBuildFile; fileRef = D0FF2A5C11F8C45A007E74E0 /* PingLoader.h */; };
+		D20A4D931F188456006D4394 /* AudioTrackPrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D20A4D911F188450006D4394 /* AudioTrackPrivateHelio.cpp */; };
+		D20A4D941F188458006D4394 /* AudioTrackPrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D20A4D921F188450006D4394 /* AudioTrackPrivateHelio.h */; };
 		D20CBD3B1EFDCCEB00A1CF78 /* MediaSampleHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D27CB03A1EFDCA7000B45384 /* MediaSampleHelio.h */; };
 		D20CBD3C1EFDCCED00A1CF78 /* MediaSampleHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D27CB0391EFDCA7000B45384 /* MediaSampleHelio.cpp */; };
+		D25159701F172ECF00273510 /* VideoTrackPrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D251596F1F172EBD00273510 /* VideoTrackPrivateHelio.h */; };
+		D25159711F172ED200273510 /* VideoTrackPrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D251596E1F172EBD00273510 /* VideoTrackPrivateHelio.cpp */; };
 		D2AC95181EF721C2005588A4 /* MediaPlayerPrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2AC95121EF721AE005588A4 /* MediaPlayerPrivateHelio.cpp */; };
 		D2AC95191EF721C5005588A4 /* MediaPlayerPrivateHelio.h in Headers */ = {isa = PBXBuildFile; fileRef = D2AC95131EF721AE005588A4 /* MediaPlayerPrivateHelio.h */; };
 		D2AC951A1EF721C9005588A4 /* MediaSourcePrivateHelio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D2AC95141EF721AE005588A4 /* MediaSourcePrivateHelio.cpp */; };
@@ -13899,6 +13903,10 @@
 		D0EDA773143E303C0028E383 /* CachedRawResource.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CachedRawResource.h; sourceTree = "<group>"; };
 		D0FF2A5B11F8C45A007E74E0 /* PingLoader.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PingLoader.cpp; sourceTree = "<group>"; };
 		D0FF2A5C11F8C45A007E74E0 /* PingLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PingLoader.h; sourceTree = "<group>"; };
+		D20A4D911F188450006D4394 /* AudioTrackPrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = AudioTrackPrivateHelio.cpp; path = helio/AudioTrackPrivateHelio.cpp; sourceTree = "<group>"; };
+		D20A4D921F188450006D4394 /* AudioTrackPrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = AudioTrackPrivateHelio.h; path = helio/AudioTrackPrivateHelio.h; sourceTree = "<group>"; };
+		D251596E1F172EBD00273510 /* VideoTrackPrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = VideoTrackPrivateHelio.cpp; path = helio/VideoTrackPrivateHelio.cpp; sourceTree = "<group>"; };
+		D251596F1F172EBD00273510 /* VideoTrackPrivateHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = VideoTrackPrivateHelio.h; path = helio/VideoTrackPrivateHelio.h; sourceTree = "<group>"; };
 		D27CB0391EFDCA7000B45384 /* MediaSampleHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MediaSampleHelio.cpp; path = helio/MediaSampleHelio.cpp; sourceTree = "<group>"; };
 		D27CB03A1EFDCA7000B45384 /* MediaSampleHelio.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = MediaSampleHelio.h; path = helio/MediaSampleHelio.h; sourceTree = "<group>"; };
 		D2AC95121EF721AE005588A4 /* MediaPlayerPrivateHelio.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = MediaPlayerPrivateHelio.cpp; path = helio/MediaPlayerPrivateHelio.cpp; sourceTree = "<group>"; };
@@ -22797,6 +22805,10 @@
 				D2AC95151EF721AE005588A4 /* MediaSourcePrivateHelio.h */,
 				D2AC95161EF721AE005588A4 /* SourceBufferPrivateHelio.cpp */,
 				D2AC95171EF721AE005588A4 /* SourceBufferPrivateHelio.h */,
+				D20A4D911F188450006D4394 /* AudioTrackPrivateHelio.cpp */,
+				D20A4D921F188450006D4394 /* AudioTrackPrivateHelio.h */,
+				D251596E1F172EBD00273510 /* VideoTrackPrivateHelio.cpp */,
+				D251596F1F172EBD00273510 /* VideoTrackPrivateHelio.h */,
 			);
 			name = helio;
 			sourceTree = "<group>";
@@ -24974,6 +24986,7 @@
 				26F0C8A01A2EC3BE002794F8 /* ContentExtensionsBackend.h in Headers */,
 				262391361A648CEE007251A3 /* ContentExtensionsDebugging.h in Headers */,
 				51FB67DC1AE6B82F00D06C5A /* ContentExtensionStyleSheet.h in Headers */,
+				D25159701F172ECF00273510 /* VideoTrackPrivateHelio.h in Headers */,
 				A149786F1ABAF33800CEF7E4 /* ContentFilter.h in Headers */,
 				A14090FD1AA51E480091191A /* ContentFilterUnblockHandler.h in Headers */,
 				97C471DC12F925BD0086354B /* ContentSecurityPolicy.h in Headers */,
@@ -24995,6 +25008,7 @@
 				06027CAD0B1CBFC000884B2D /* ContextMenuItem.h in Headers */,
 				7ADE722610CBBB9B006B3B3A /* ContextMenuProvider.h in Headers */,
 				759CB837192DA9190012BC64 /* ControlStates.h in Headers */,
+				D20A4D941F188458006D4394 /* AudioTrackPrivateHelio.h in Headers */,
 				FD31602912B0267600C1A359 /* ConvolverNode.h in Headers */,
 				D8B6152F1032495100C8554A /* Cookie.h in Headers */,
 				E1424C94164B52C800F32D40 /* CookieJar.h in Headers */,
@@ -29397,6 +29411,7 @@
 				E44613A70CD6331000FADA75 /* HTMLSourceElement.cpp in Sources */,
 				977E2DCD12F0E28300C13379 /* HTMLSourceTracker.cpp in Sources */,
 				978AD67414130A8D00C7CAE3 /* HTMLSpanElement.cpp in Sources */,
+				D20A4D931F188456006D4394 /* AudioTrackPrivateHelio.cpp in Sources */,
 				536D5A21193E18EE00CE4CAB /* HTMLSrcsetParser.cpp in Sources */,
 				A871DC260A15205700B12A68 /* HTMLStyleElement.cpp in Sources */,
 				D3D4E972130C7CFE007BA540 /* HTMLSummaryElement.cpp in Sources */,
@@ -30468,6 +30483,7 @@
 				D3AA10F3123A98AA0092152B /* MediaQueryMatcher.cpp in Sources */,
 				9493B6C01D74B4120088E780 /* MediaQueryParser.cpp in Sources */,
 				C90843CF1B18E47D00B68564 /* MediaRemoteControls.cpp in Sources */,
+				D25159711F172ED200273510 /* VideoTrackPrivateHelio.cpp in Sources */,
 				CD8ACA8E1D23971900ECC59E /* MediaRemoteSoftLink.cpp in Sources */,
 				CEEFCD7919DB31F7003876D7 /* MediaResourceLoader.cpp in Sources */,
 				1B124D8F1D380BB600ECDFB0 /* MediaSampleAVFObjC.mm in Sources */,

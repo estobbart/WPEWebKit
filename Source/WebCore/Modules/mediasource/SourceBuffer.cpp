@@ -579,15 +579,13 @@ void SourceBuffer::appendBufferTimerFired()
     }
 
     m_private->append(m_pendingAppendData.data(), appendSize);
+    m_pendingAppendData.clear();
 }
 
 void SourceBuffer::sourceBufferPrivateAppendComplete(SourceBufferPrivate*, AppendResult result)
 {
     if (isRemoved())
         return;
-
-    if (m_pendingAppendData.size())
-        m_pendingAppendData.clear();
 
     // Resolve the changes it TrackBuffers' buffered ranges
     // into the SourceBuffer's buffered ranges
@@ -1120,6 +1118,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveInitializationSegment(SourceBuff
     // 2. If the initialization segment has no audio, video, or text tracks, then run the append error algorithm
     // with the decode error parameter set to true and abort these steps.
     if (segment.audioTracks.isEmpty() && segment.videoTracks.isEmpty() && segment.textTracks.isEmpty()) {
+        printf("segment.audioTracks.isEmpty() && segment.videoTracks.isEmpty() && segment.textTracks.isEmpty()\n");
         appendError(true);
         return;
     }
@@ -1217,6 +1216,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveInitializationSegment(SourceBuff
 
             // 5.2.8 Create a new track buffer to store coded frames for this track.
             ASSERT(!m_trackBufferMap.contains(newAudioTrack->id()));
+            // printf("%%%%%%%%%%%% appending : `%s` to m_trackBufferMap\n", newAudioTrack->id().string().utf8().data());
             TrackBuffer& trackBuffer = m_trackBufferMap.add(newAudioTrack->id(), TrackBuffer()).iterator->value;
 
             // 5.2.9 Add the track description for this track to the track buffer.
@@ -1258,6 +1258,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveInitializationSegment(SourceBuff
 
             // 5.3.8 Create a new track buffer to store coded frames for this track.
             ASSERT(!m_trackBufferMap.contains(newVideoTrack->id()));
+            // printf("%%%%%%%%%%%% appending : `%s` to m_trackBufferMap\n", newVideoTrack->id().string().utf8().data());
             TrackBuffer& trackBuffer = m_trackBufferMap.add(newVideoTrack->id(), TrackBuffer()).iterator->value;
 
             // 5.3.9 Add the track description for this track to the track buffer.
@@ -1509,10 +1510,12 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         if (it == m_trackBufferMap.end()) {
             // The client managed to append a sample with a trackID not present in the initialization
             // segment. This would be a good place to post an message to the developer console.
+            printf("didDropSample due to not finding trackID:`%s` in  m_trackBufferMap\n", trackID.string().utf8().data());
             didDropSample();
             return;
         }
         TrackBuffer& trackBuffer = it->value;
+        // printf("FOUND TRACK BUFFER FOR trackID:%s\n", trackID.string().utf8().data());
 
         // 1.6 ↳ If last decode timestamp for track buffer is set and decode timestamp is less than last
         // decode timestamp:
@@ -1544,6 +1547,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
                 trackBuffer.needRandomAccessFlag = true;
             }
 
+            printf("continue;\n");
             // 1.6.6 Jump to the Loop Top step above to restart processing of the current coded frame.
             continue;
         }
@@ -1567,6 +1571,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         // the next coded frame.
         if (presentationTimestamp < m_appendWindowStart || frameEndTimestamp > m_appendWindowEnd) {
             trackBuffer.needRandomAccessFlag = true;
+            printf("trackBuffer.needRandomAccessFlag = true;\n");
             didDropSample();
             return;
         }
@@ -1580,6 +1585,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         if (presentationTimestamp < presentationStartTime) {
             LOG(MediaSource, "SourceBuffer::sourceBufferPrivateDidReceiveSample(%p) - failing because presentationTimestamp < presentationStartTime", this);
             m_source->streamEndedWithError(MediaSource::EndOfStreamError::Decode);
+            printf("m_source->streamEndedWithError(MediaSource::EndOfStreamError::Decode);\n");
             return;
         }
 
@@ -1588,6 +1594,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
             // 1.11.1 If the coded frame is not a random access point, then drop the coded frame and jump
             // to the top of the loop to start processing the next coded frame.
             if (!sample.isSync()) {
+                printf("!sample.isSync()\n");
                 didDropSample();
                 return;
             }
@@ -1919,6 +1926,9 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
     unsigned enqueuedSamples = 0;
 #endif
 
+    if (!trackBuffer.decodeQueue.empty()) {
+        printf("Pre queue trackBuffer(%s).decodeQueue.empty(): %i \n", trackID.string().utf8().data(), trackBuffer.decodeQueue.empty());
+    }
     while (!trackBuffer.decodeQueue.empty()) {
         if (!m_private->isReadyForMoreSamples(trackID)) {
             m_private->notifyClientWhenReadyForMoreSamples(trackID);
@@ -1939,8 +1949,14 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
         // new current time without triggering this early return.
         // FIXME(135867): Make this gap detection logic less arbitrary.
         MediaTime oneSecond(1, 1);
-        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond)
+        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond) {
+            printf("trackBuffer.lastEnqueuedDecodeEndTime.isValid() == %i && sample->decodeTime(%f) - trackBuffer.lastEnqueuedDecodeEndTime(%f) > oneSecond == %i\n",
+                   trackBuffer.lastEnqueuedDecodeEndTime.isValid(),
+                   sample->decodeTime().toFloat(),
+                   trackBuffer.lastEnqueuedDecodeEndTime.toFloat(),
+                   sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond);
             break;
+        }
 
         trackBuffer.lastEnqueuedPresentationTime = sample->presentationTime();
         trackBuffer.lastEnqueuedDecodeEndTime = sample->decodeTime() + sample->duration();
@@ -1949,6 +1965,8 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
         ++enqueuedSamples;
 #endif
     }
+
+    printf("Post queue trackBuffer(%s).decodeQueue.empty(): %i \n", trackID.string().utf8().data(), trackBuffer.decodeQueue.empty());
 
     LOG(MediaSource, "SourceBuffer::provideMediaData(%p) - Enqueued %u samples", this, enqueuedSamples);
 }
