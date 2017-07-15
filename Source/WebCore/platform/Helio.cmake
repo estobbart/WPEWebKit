@@ -8,6 +8,8 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
         platform/graphics/helio/MediaSourcePrivateHelio.cpp
         platform/graphics/helio/SourceBufferPrivateHelio.cpp
         platform/graphics/helio/MediaSampleHelio.cpp
+        platform/graphics/helio/AudioTrackPrivateHelio.cpp
+        platform/graphics/helio/VideoTrackPrivateHelio.cpp
     )
 
     list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
