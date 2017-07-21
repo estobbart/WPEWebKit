@@ -31,7 +31,7 @@
 #ifndef SDPProcessorScriptResource_h
 #define SDPProcessorScriptResource_h
 
-#if ENABLE(WEB_RTC)
+#if ENABLE(WEB_RTC) && !USE(QT5WEBRTC)
 
 #include <wtf/text/WTFString.h>
 

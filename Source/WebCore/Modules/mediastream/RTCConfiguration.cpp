@@ -67,10 +67,15 @@ static ExceptionOr<Ref<RTCIceServer>> parseIceServer(const Dictionary& iceServer
     // So we convert to a string always, which converts a sequence to a string in the format: "foo, bar, ..",
     // then checking for a comma in the string assures that a string was a sequence and then we convert
     // it to a sequence safely.
-    if (urlString.isEmpty())
-        return Exception { INVALID_ACCESS_ERR };
+    if (urlString.isEmpty()) {
+        // Legacy mode
+        iceServer.get("url", urlString);
+        if (urlString.isEmpty()) {
+            return Exception { INVALID_ACCESS_ERR };
+        }
+    }
 
-    if (urlString.find(',') != notFound && iceServer.get("urls", urlsList) && urlsList.size()) {
+    if (urlString.find(',') != notFound && (iceServer.get("urls", urlsList) || iceServer.get("url", urlsList)) && urlsList.size()) {
         for (auto iter = urlsList.begin(); iter != urlsList.end(); ++iter) {
             if (!validateIceServerURL(*iter))
                 return Exception { INVALID_ACCESS_ERR };
@@ -86,10 +91,10 @@ static ExceptionOr<Ref<RTCIceServer>> parseIceServer(const Dictionary& iceServer
 
 ExceptionOr<RefPtr<RTCConfiguration>> RTCConfiguration::create(const Dictionary& configuration)
 {
-    if (configuration.isUndefinedOrNull())
-        return nullptr;
-
     auto result = adoptRef(*new RTCConfiguration);
+    if (configuration.isUndefinedOrNull())
+        return RefPtr<RTCConfiguration> { WTFMove(result) };
+
     auto initializeResult = result->initialize(configuration);
     if (initializeResult.hasException())
         return initializeResult.releaseException();
@@ -106,14 +111,25 @@ ExceptionOr<void> RTCConfiguration::initialize(const Dictionary& configuration)
     ArrayValue iceServers;
     bool ok = configuration.get("iceServers", iceServers);
     if (!ok || iceServers.isUndefinedOrNull())
+#if !USE(QT5WEBRTC)
         return Exception { TYPE_MISMATCH_ERR };
+#else
+        return { };
+#endif
 
     size_t numberOfServers;
     ok = iceServers.length(numberOfServers);
+#if !USE(QT5WEBRTC)
     if (!ok)
         return Exception { TYPE_MISMATCH_ERR };
     if (!numberOfServers)
         return Exception { INVALID_ACCESS_ERR };
+#else
+    if (!ok)
+        return { };
+    if (!numberOfServers)
+        return { };
+#endif
 
     for (size_t i = 0; i < numberOfServers; ++i) {
         Dictionary iceServerDict;

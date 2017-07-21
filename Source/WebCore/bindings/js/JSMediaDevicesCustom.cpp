@@ -294,6 +294,55 @@ static void parseMediaTrackConstraintSetForKey(const Dictionary& mediaTrackConst
         map.set(constraintType, createStringConstraint(mediaTrackConstraintSet, name, constraintType, constraintSetType));
         break;
 
+    // Compatibility Constraints
+    case MediaConstraintType::MinWidth:
+    case MediaConstraintType::MaxWidth:
+    case MediaConstraintType::MinHeight:
+    case MediaConstraintType::MaxHeight:
+    case MediaConstraintType::MinFrameRate:
+    case MediaConstraintType::MaxFrameRate:
+    case MediaConstraintType::MinAspectRatio:
+    case MediaConstraintType::MaxAspectRatio:
+    case MediaConstraintType::GoogEchoCancellation:
+    case MediaConstraintType::GoogEchoCancellation2:
+    case MediaConstraintType::GoogDAEchoCancellation:
+    case MediaConstraintType::GoogAutoGainControl:
+    case MediaConstraintType::GoogAutoGainControl2:
+    case MediaConstraintType::GoogNoiseSuppression:
+    case MediaConstraintType::GoogNoiseSuppression2:
+    case MediaConstraintType::GoogHighpassFilter:
+    case MediaConstraintType::GoogTypingNoiseDetection:
+    case MediaConstraintType::GoogAudioMirroring:
+    case MediaConstraintType::AudioDebugRecording:
+    case MediaConstraintType::GoogNoiseReduction:
+    case MediaConstraintType::OfferToReceiveAudio:
+    case MediaConstraintType::OfferToReceiveVideo:
+    case MediaConstraintType::VoiceActivityDetection:
+    case MediaConstraintType::IceRestart:
+    case MediaConstraintType::GoogUseRtpMUX:
+    case MediaConstraintType::DtlsSrtpKeyAgreement:
+    case MediaConstraintType::RtpDataChannels:
+    case MediaConstraintType::Preferh264:
+    case MediaConstraintType::IgnoreInactiveInterfaces:
+    case MediaConstraintType::GoogDscp:
+    case MediaConstraintType::GoogIPv6:
+    case MediaConstraintType::GoogSuspendBelowMinBitrate:
+    case MediaConstraintType::GoogNumUnsignalledRecvStreams:
+    case MediaConstraintType::GoogCombinedAudioVideoBwe:
+    case MediaConstraintType::GoogScreencastMinBitrate:
+    case MediaConstraintType::GoogCpuOveruseDetection:
+    case MediaConstraintType::GoogCpuUnderuseThreshold:
+    case MediaConstraintType::GoogCpuOveruseThreshold:
+    case MediaConstraintType::GoogCpuUnderuseEncodeRsdThreshold:
+    case MediaConstraintType::GoogCpuOveruseEncodeRsdThreshold:
+    case MediaConstraintType::GoogCpuOveruseEncodeUsage:
+    case MediaConstraintType::GoogHighStartBitrate:
+    case MediaConstraintType::GoogHighBitrate:
+    case MediaConstraintType::GoogVeryHighBitrate:
+    case MediaConstraintType::GoogPayloadPadding:
+        map.set(constraintType, createStringConstraint(mediaTrackConstraintSet, name, constraintType, constraintSetType));
+        break;
+
     case MediaConstraintType::Unknown:
         LOG(Media, "parseMediaTrackConstraintSetForKey() - ignoring unsupported constraint '%s'.", name.utf8().data());
         return;
@@ -303,9 +352,12 @@ static void parseMediaTrackConstraintSetForKey(const Dictionary& mediaTrackConst
 static void parseAdvancedConstraints(const Dictionary& mediaTrackConstraints, Vector<MediaTrackConstraintSetMap>& advancedConstraints)
 {
     ArrayValue sequenceOfMediaTrackConstraintSets;
-    if (!mediaTrackConstraints.get("advanced", sequenceOfMediaTrackConstraintSets) || sequenceOfMediaTrackConstraintSets.isUndefinedOrNull()) {
-        LOG(Media, "parseAdvancedConstraints() - value of advanced key is not a list.");
-        return;
+    if (!mediaTrackConstraints.get("optional", sequenceOfMediaTrackConstraintSets) || sequenceOfMediaTrackConstraintSets.isUndefinedOrNull()) {
+	    LOG(Media, "parseAdvancedConstraints() - value of optional key is not a list.");
+	    if (!mediaTrackConstraints.get("advanced", sequenceOfMediaTrackConstraintSets) || sequenceOfMediaTrackConstraintSets.isUndefinedOrNull()) {
+		    LOG(Media, "parseAdvancedConstraints() - value of advanced key is not a list.");
+		    return;
+	    }
     }
 
     size_t numberOfConstraintSets;
@@ -333,6 +385,20 @@ static void parseAdvancedConstraints(const Dictionary& mediaTrackConstraints, Ve
     }
 }
 
+static void parseMandatoryConstraints(const Dictionary& mediaTrackConstraints, MediaTrackConstraintSetMap& mandatoryConstraints)
+{
+    Dictionary mediaTrackConstraintSet;
+    if (!mediaTrackConstraints.get("mandatory", mediaTrackConstraintSet) || mediaTrackConstraintSet.isUndefinedOrNull()) {
+        LOG(Media, "parseMandatoryConstraints() - ignoring constraint");
+        return;
+    }
+
+    Vector<String> localKeys;
+    mediaTrackConstraintSet.getOwnPropertyNames(localKeys);
+    for (auto& localKey : localKeys)
+        parseMediaTrackConstraintSetForKey(mediaTrackConstraintSet, localKey, mandatoryConstraints, ConstraintSetType::Mandatory);
+}
+
 void parseMediaConstraintsDictionary(const Dictionary& mediaTrackConstraints, MediaTrackConstraintSetMap& mandatoryConstraints, Vector<MediaTrackConstraintSetMap>& advancedConstraints)
 {
     if (mediaTrackConstraints.isUndefinedOrNull())
@@ -342,8 +408,10 @@ void parseMediaConstraintsDictionary(const Dictionary& mediaTrackConstraints, Me
     mediaTrackConstraints.getOwnPropertyNames(keys);
 
     for (auto& key : keys) {
-        if (key == "advanced")
+        if (key == "optional" || key == "advanced")
             parseAdvancedConstraints(mediaTrackConstraints, advancedConstraints);
+        else if(key == "mandatory")
+            parseMandatoryConstraints(mediaTrackConstraints, mandatoryConstraints);
         else
             parseMediaTrackConstraintSetForKey(mediaTrackConstraints, key, mandatoryConstraints, ConstraintSetType::Mandatory);
     }

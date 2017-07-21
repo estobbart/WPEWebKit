@@ -37,12 +37,17 @@ function initializeRTCPeerConnection(configuration)
     if (arguments.length < 1)
         @throwTypeError("Not enough arguments");
 
-    if (!@isObject(configuration))
-        @throwTypeError("RTCPeerConnection argument must be a valid Dictionary");
+    //if (!@isObject(configuration))
+    //    @throwTypeError("RTCPeerConnection argument must be a valid Dictionary");
 
     // FIXME: Handle errors in a better way than catching and re-throwing (http://webkit.org/b/158936)
     try {
-        this.@initializeWith(configuration);
+        var configuration = arguments[0] || {};
+        var constraints = {};
+        if (arguments.length >= 2)
+            constraints = arguments[1];
+
+        this.@initializeWith(configuration, constraints);
     } catch (e) {
         const message = e.name === "TypeMismatchError" ? "Invalid RTCPeerConnection constructor arguments"
             : "Error creating RTCPeerConnection";

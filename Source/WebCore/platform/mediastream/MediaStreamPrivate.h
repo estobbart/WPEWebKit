@@ -47,7 +47,7 @@
 #include <wtf/Vector.h>
 #include <wtf/WeakPtr.h>
 
-#if USE(GSTREAMER)
+#if USE(GSTREAMER) && !USE(QT5WEBRTC)
 #include "GRefPtrGStreamer.h"
 #include <owr/owr_gst_video_renderer.h>
 #endif
@@ -69,6 +69,7 @@ public:
     };
 
     static Ref<MediaStreamPrivate> create(const Vector<Ref<RealtimeMediaSource>>& audioSources, const Vector<Ref<RealtimeMediaSource>>& videoSources);
+    static Ref<MediaStreamPrivate> create(const String& id, const Vector<Ref<RealtimeMediaSource>>& audioSources, const Vector<Ref<RealtimeMediaSource>>& videoSources);
     static Ref<MediaStreamPrivate> create(const MediaStreamTrackPrivateVector&);
 
     virtual ~MediaStreamPrivate();
@@ -105,7 +106,7 @@ public:
 
     WeakPtr<MediaStreamPrivate> createWeakPtr() { return m_weakPtrFactory.createWeakPtr(); }
 
-#if USE(GSTREAMER)
+#if USE(GSTREAMER) && !USE(QT5WEBRTC)
     void setVideoRenderer(OwrGstVideoRenderer* renderer, GstElement* sink) { m_gstVideoRenderer = renderer; m_gstVideoSinkElement = sink; }
     GRefPtr<GstElement> getVideoSinkElement() const { return m_gstVideoSinkElement; }
     GRefPtr<OwrGstVideoRenderer> getVideoRenderer() const { return m_gstVideoRenderer; }
