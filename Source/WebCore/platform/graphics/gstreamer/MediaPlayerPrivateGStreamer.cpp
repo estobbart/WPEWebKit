@@ -79,6 +79,30 @@ using namespace std;
 
 namespace WebCore {
 
+double gEnterKeyDownTime = 0.0;
+
+void noticeEnterKeyDownEvent()
+{
+    gEnterKeyDownTime = WTF::monotonicallyIncreasingTimeMS();
+}
+
+void noticeFirstVideoFrame()
+{
+    if (gEnterKeyDownTime)
+    {
+        double diffTime = WTF::monotonicallyIncreasingTimeMS() - gEnterKeyDownTime;
+        gEnterKeyDownTime = 0.0;
+        WTFLogAlways("Media: browse-to-watch = %.2f ms\n", diffTime);
+    }
+}
+
+#if USE(WESTEROS_SINK) && USE(HOLE_PUNCH_GSTREAMER)
+static void onFirstVideoFrameCallback(MediaPlayerPrivateGStreamer* /*player*/)
+{
+    noticeFirstVideoFrame();
+}
+#endif
+
 static void busMessageCallback(GstBus*, GstMessage* message, MediaPlayerPrivateGStreamer* player)
 {
     player->handleMessage(message);
@@ -226,6 +250,10 @@ MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
     if (m_videoSink) {
         GRefPtr<GstPad> videoSinkPad = adoptGRef(gst_element_get_static_pad(m_videoSink.get(), "sink"));
         g_signal_handlers_disconnect_matched(videoSinkPad.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+#if USE(WESTEROS_SINK) && USE(HOLE_PUNCH_GSTREAMER)
+        g_signal_handlers_disconnect_by_func(G_OBJECT(m_videoSink.get()),
+            reinterpret_cast<gpointer>(onFirstVideoFrameCallback), this);
+#endif
     }
 
     if (m_pipeline) {
@@ -2266,6 +2294,13 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
     m_videoSink = gst_element_factory_create(westerosfactory.get(), "WesterosVideoSink");
     g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
     g_object_set(G_OBJECT(m_videoSink.get()), "zorder",0.0f, nullptr);
+
+    if (m_videoSink)
+#if PLATFORM(INTEL_CE)
+        g_signal_connect_swapped(m_videoSink.get(), "firstframe-callback", G_CALLBACK(onFirstVideoFrameCallback), this);
+#else
+        g_signal_connect_swapped(m_videoSink.get(), "first-video-frame-callback", G_CALLBACK(onFirstVideoFrameCallback), this);
+#endif // PLATFORM(INTEL_CE)
 #endif
 
 #if !USE(WESTEROS_SINK) && !USE(FUSION_SINK)

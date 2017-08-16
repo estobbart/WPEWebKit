@@ -152,6 +152,9 @@ bool UserInputBridge::handleMouseForceEvent(const PlatformMouseEvent& mouseEvent
     return m_page.mainFrame().eventHandler().handleMouseForceEvent(mouseEvent);
 }
 
+// Implemented in MediaPlayerPrivateGStreamer.cpp
+void noticeEnterKeyDownEvent();
+
 bool UserInputBridge::handleKeyEvent(const PlatformKeyboardEvent& keyEvent, InputSource inputSource)
 {
 #if ENABLE(WEB_REPLAY)
@@ -166,6 +169,11 @@ bool UserInputBridge::handleKeyEvent(const PlatformKeyboardEvent& keyEvent, Inpu
 #else
     UNUSED_PARAM(inputSource);
 #endif
+
+    if (keyEvent.type() == PlatformEvent::KeyDown && keyEvent.keyIdentifier() == "Enter")
+    {
+        noticeEnterKeyDownEvent();
+    }
 
     return m_page.focusController().focusedOrMainFrame().eventHandler().keyEvent(keyEvent);
 }
