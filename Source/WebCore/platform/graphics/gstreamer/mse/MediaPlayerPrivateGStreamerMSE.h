@@ -24,7 +24,7 @@
 
 #pragma once
 
-#if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE) 
+#if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE)
 
 #include "GRefPtrGStreamer.h"
 #include "MediaPlayerPrivateGStreamer.h"
@@ -134,7 +134,7 @@ private:
     RefPtr<MediaSourceClientGStreamerMSE> m_mediaSourceClient;
     MediaTime m_mediaTimeDuration;
     bool m_mseSeekCompleted = true;
-    RefPtr<PlaybackPipeline> m_playbackPipeline;
+    RefPtr<PlaybackPipeline> m_playbackPipeline; // Ref -> RefPtr?
 };
 
 } // namespace WebCore

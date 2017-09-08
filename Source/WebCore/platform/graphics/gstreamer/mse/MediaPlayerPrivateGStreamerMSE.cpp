@@ -74,6 +74,11 @@ static const char* dumpReadyState(WebCore::MediaPlayer::ReadyState readyState)
 // Max interval in seconds to stay in the READY state on manual state change requests.
 static const unsigned gReadyStateTimerInterval = 60;
 
+// Global Viper PlaybackPipeline
+// #ifdef RDK_COMCAST_VIPER
+static WebCore::PlaybackPipeline * gViperPlaybackPipelinePtr = nullptr;
+// #endif
+
 GST_DEBUG_CATEGORY(webkit_mse_debug);
 #define GST_CAT_DEFAULT webkit_mse_debug
 
@@ -82,6 +87,11 @@ namespace WebCore {
 void MediaPlayerPrivateGStreamerMSE::registerMediaEngine(MediaEngineRegistrar registrar)
 {
     if (isAvailable()) {
+// #ifdef RDK_COMCAST_VIPER
+        std::cout << "MediaPlayerPrivateGStreamerMSE::registerMediaEngine" << std::endl;
+        gViperPlaybackPipelinePtr = RefPtr<PlaybackPipeline>(PlaybackPipeline::create()).leakRef();
+        MediaPlayerPrivateGStreamer::load(String("mediasource:VIPER_PLAYBACK_PIPELINE"));
+// #endif
         registrar([](MediaPlayer* player) { return std::make_unique<MediaPlayerPrivateGStreamerMSE>(player); },
             getSupportedTypes, supportsType, nullptr, nullptr, nullptr, supportsKeySystem);
     }
@@ -148,8 +158,19 @@ void MediaPlayerPrivateGStreamerMSE::load(const String& urlString)
     if (UNLIKELY(!initializeGStreamerAndRegisterWebKitMSEElement()))
         return;
 
-    if (!m_playbackPipeline)
-        m_playbackPipeline = PlaybackPipeline::create();
+// #ifdef RDK_COMCAST_VIPER
+    if ((urlString.contains("comcast.net") || getenv("VIPER_PLAYBACK_PIPELINE")) &&
+        gViperPlaybackPipelinePtr != nullptr && gViperPlaybackPipelinePtr->webKitMediaSrc() == nullptr) {
+        std::cout << "MediaPlayerPrivateGStreamerMSE::load - Using ViperPlaybackPipeline" << std::endl;
+        m_playbackPipeline = adoptRef(gViperPlaybackPipelinePtr);
+    } else {
+        std::cout << "MediaPlayerPrivateGStreamerMSE::load - new PlaybackPipeline" << std::endl;
+// #endif
+        if (!m_playbackPipeline)
+            m_playbackPipeline = PlaybackPipeline::create();
+// #ifdef RDK_COMCAST_VIPER
+    }
+// #endif
 
     MediaPlayerPrivateGStreamer::load(urlString);
 }
