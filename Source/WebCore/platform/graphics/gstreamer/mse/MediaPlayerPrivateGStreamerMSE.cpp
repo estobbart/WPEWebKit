@@ -50,6 +50,8 @@
 #include <wtf/Condition.h>
 #include <wtf/NeverDestroyed.h>
 
+#include <iostream>
+
 #if USE(PLAYREADY)
 #include "PlayreadySession.h"
 #endif
@@ -60,6 +62,18 @@
 #include "CDMSessionOpenCDM.h"
 #endif
 #endif
+
+// #ifdef VIPER
+#include <sys/time.h>
+
+void print_current_timestamp(char * message) {
+    struct timeval te;
+    gettimeofday(&te, NULL); // get current time
+    long long milliseconds = te.tv_sec*1000LL + te.tv_usec/1000; // caculate milliseconds
+    printf("%s milliseconds: %lld\n", message, milliseconds);
+    //return milliseconds;
+}
+// #endif
 
 static const char* dumpReadyState(WebCore::MediaPlayer::ReadyState readyState)
 {
@@ -76,26 +90,28 @@ static const char* dumpReadyState(WebCore::MediaPlayer::ReadyState readyState)
 // Max interval in seconds to stay in the READY state on manual state change requests.
 static const unsigned gReadyStateTimerInterval = 60;
 
-// Global Viper PlaybackPipeline
-// #ifdef RDK_COMCAST_VIPER
-static WebCore::PlaybackPipeline * gViperPlaybackPipelinePtr = nullptr;
-// #endif
 
 GST_DEBUG_CATEGORY(webkit_mse_debug);
 #define GST_CAT_DEFAULT webkit_mse_debug
 
 namespace WebCore {
 
+// Global Viper PlaybackPipeline
+// #ifdef RDK_COMCAST_VIPER
+static PlaybackPipeline * gViperPlaybackPipelinePtr = nullptr;
+// #endif
+
 void MediaPlayerPrivateGStreamerMSE::registerMediaEngine(MediaEngineRegistrar registrar)
 {
     if (isAvailable()) {
-// #ifdef RDK_COMCAST_VIPER
-        std::cout << "MediaPlayerPrivateGStreamerMSE::registerMediaEngine" << std::endl;
-        gViperPlaybackPipelinePtr = RefPtr<PlaybackPipeline>(PlaybackPipeline::create()).leakRef();
-        MediaPlayerPrivateGStreamer::load(String("mediasource:VIPER_PLAYBACK_PIPELINE"));
-// #endif
         registrar([](MediaPlayer* player) { return std::make_unique<MediaPlayerPrivateGStreamerMSE>(player); },
             getSupportedTypes, supportsType, nullptr, nullptr, nullptr, supportsKeySystem);
+
+// #ifdef RDK_COMCAST_VIPER
+        // std::cout << "MediaPlayerPrivateGStreamerMSE::registerMediaEngine" << std::endl;
+        gViperPlaybackPipelinePtr = RefPtr<PlaybackPipeline>(PlaybackPipeline::create()).leakRef();
+        // MediaPlayerPrivateGStreamer::load(String("mediasource:VIPER_PLAYBACK_PIPELINE"));
+// #endif
     }
 }
 
@@ -168,10 +184,13 @@ void MediaPlayerPrivateGStreamerMSE::load(const String& urlString)
     } else {
         std::cout << "MediaPlayerPrivateGStreamerMSE::load - new PlaybackPipeline" << std::endl;
 // #endif
-        if (!m_playbackPipeline)
+        if (!m_playbackPipeline) {
+            print_current_timestamp("Start PlaybackPipeline::create:");
             m_playbackPipeline = PlaybackPipeline::create();
+        }
+        print_current_timestamp("End PlaybackPipeline::create:");
 // #ifdef RDK_COMCAST_VIPER
-    }
+   }
 // #endif
 
     MediaPlayerPrivateGStreamer::load(urlString);
@@ -180,7 +199,9 @@ void MediaPlayerPrivateGStreamerMSE::load(const String& urlString)
 void MediaPlayerPrivateGStreamerMSE::load(const String& url, MediaSourcePrivateClient* mediaSource)
 {
     m_mediaSource = mediaSource;
+    print_current_timestamp("START MediaPlayerPrivateGStreamerMSE::load url, mediaSurce:");
     load(String::format("mediasource%s", url.utf8().data()));
+    print_current_timestamp("END MediaPlayerPrivateGStreamerMSE::load url, mediaSurce:");
 }
 
 void MediaPlayerPrivateGStreamerMSE::pause()

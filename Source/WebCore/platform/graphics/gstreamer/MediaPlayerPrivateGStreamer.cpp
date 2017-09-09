@@ -47,6 +47,7 @@
 #include <wtf/NeverDestroyed.h>
 #include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
+#include <iostream>
 
 #if USE(GSTREAMER_WEBKIT_HTTP_SRC)
 #include "WebKitWebSourceGStreamer.h"
@@ -78,6 +79,8 @@ GST_DEBUG_CATEGORY_EXTERN(webkit_media_player_debug);
 using namespace std;
 
 namespace WebCore {
+
+GstElement* MediaPlayerPrivateGStreamer::gViperPipelinePtr = NULL;
 
 double gEnterKeyDownTime = 0.0;
 
@@ -126,11 +129,56 @@ void MediaPlayerPrivateGStreamer::setAudioStreamProperties(GObject* object)
     GST_DEBUG("Set media.role as %s at %s", role, elementName.get());
 }
 
+
+GstElement* MediaPlayerPrivateGStreamer::createGSTViperPlayBin() {
+    //ASSERT(!m_pipeline);
+    if (gViperPipelinePtr != NULL) {
+        printf("ERROR: gViperPipelinePtr != NULL\n");
+        return gViperPipelinePtr;
+    }
+
+    // gst_element_factory_make() returns a floating reference so
+    // we should not adopt.
+    GstElement* gst_pipeline = gst_element_factory_make("playbin", "play");
+
+
+// #if ENABLE(TEXT_SINK)
+//     unsigned flagText = getGstPlayFlag("text");
+// #else
+//     unsigned flagText = 0x0;
+// #endif
+
+// TODO: May remove audio & video and only use native.. TBD
+    unsigned flagAudio = getGstPlayFlag("audio");
+    unsigned flagVideo = getGstPlayFlag("video");
+
+#if ENABLE(NATIVE_VIDEO)
+    unsigned flagNativeVideo = getGstPlayFlag("native-video");
+#else
+    unsigned flagNativeVideo = 0x0;
+#endif
+
+#if ENABLE(NATIVE_AUDIO)
+    unsigned flagNativeAudio = getGstPlayFlag("native-audio");
+#else
+    unsigned flagNativeAudio = 0x0;
+#endif
+
+    g_object_set(gst_pipeline, "flags",  flagAudio | flagVideo | flagNativeVideo | flagNativeAudio, nullptr);
+
+    return gst_pipeline;
+}
+
 void MediaPlayerPrivateGStreamer::registerMediaEngine(MediaEngineRegistrar registrar)
 {
-    if (isAvailable())
+    if (isAvailable()) {
         registrar([](MediaPlayer* player) { return std::make_unique<MediaPlayerPrivateGStreamer>(player); },
             getSupportedTypes, supportsType, 0, 0, 0, supportsKeySystem);
+// #ifdef RDK_COMCAST_VIPER
+        printf("gViperPipelinePtr = createGSTViperPlayBin();\n");
+        gViperPipelinePtr = createGSTViperPlayBin();
+// #endif
+    }
 }
 
 bool initializeGStreamerAndRegisterWebKitElements()
@@ -288,35 +336,71 @@ void MediaPlayerPrivateGStreamer::load(const String& urlString)
         m_url.setProtocol("webkit+" + m_url.protocol());
 #endif
 
-    if (!m_pipeline)
-        createGSTPlayBin();
+    if (!m_pipeline) {
+// #if RDK_COMCAST_VIPER
+        if (urlString.contains("comcast.net") || getenv("VIPER_PLAYBACK_PIPELINE")) {
+            std::cout << "MediaPlayerPrivateGStreamer::load - using gViperPipelinePtr" << std::endl;
+            setPipeline(gViperPipelinePtr);
+            setupListeners();
+        } else {
+            std::cout << "MediaPlayerPrivateGStreamer::load - createGSTPlayBin" << std::endl;
+// #endif
+            createGSTPlayBin();
+// #if RDK_COMCAST_VIPER
+        }
+// #endif
+    }
 
-    if (m_fillTimer.isActive())
+    std::cout << "MediaPlayerPrivateGStreamer::load - m_fillTimer.isActive()" << std::endl;
+    if (m_fillTimer.isActive()) {
+        std::cout << "MediaPlayerPrivateGStreamer::load - m_fillTimer.stop()" << std::endl;
         m_fillTimer.stop();
+    }
 
     ASSERT(m_pipeline);
 
+    std::cout << "MediaPlayerPrivateGStreamer::load - g_object_set()" << std::endl;
     g_object_set(m_pipeline.get(), "uri", m_url.string().utf8().data(), nullptr);
 
     GST_INFO("Load %s", m_url.string().utf8().data());
 
     if (m_preload == MediaPlayer::None) {
+        std::cout << "MediaPlayerPrivateGStreamer::load - Delaying load." << std::endl;
         GST_DEBUG("Delaying load.");
         m_delayingLoad = true;
     }
 
     // Reset network and ready states. Those will be set properly once
     // the pipeline pre-rolled.
+    std::cout << "MediaPlayerPrivateGStreamer::load - m_networkState = MediaPlayer::Loading;" << std::endl;
     m_networkState = MediaPlayer::Loading;
     m_player->networkStateChanged();
     m_readyState = MediaPlayer::HaveNothing;
 
+    std::cout << "MediaPlayerPrivateGStreamer::load - m_player->readyStateChanged();" << std::endl;
     m_player->readyStateChanged();
     m_volumeAndMuteInitialized = false;
     m_durationAtEOS = 0;
 
-    if (!m_delayingLoad)
+    if (!m_delayingLoad) {
+        std::cout << "MediaPlayerPrivateGStreamer::load - commitLoad()" << std::endl;
         commitLoad();
+    }
+
+//#ifdef VIPER
+    if(gViperPipelinePtr == pipeline()) {
+        printf("gViperPipelinePtr == pipeline()\n");
+        GRefPtr<GstElement> source = nullptr;
+        g_object_get(m_pipeline.get(), "source", &source.outPtr(), nullptr);
+        if (source != nullptr) {
+            printf("source != nullptr sourceChanged skipped...\n");
+            // TODO: check state..
+            //sourceChanged();
+        }
+    } else {
+        printf("pipeline() %p gViperPipelinePtr  %p \n", pipeline(), gViperPipelinePtr);
+    }
+//#endif
 }
 
 #if ENABLE(MEDIA_SOURCE)
@@ -1533,6 +1617,7 @@ unsigned long long MediaPlayerPrivateGStreamer::totalBytes() const
 
 void MediaPlayerPrivateGStreamer::sourceChangedCallback(MediaPlayerPrivateGStreamer* player)
 {
+    printf("MediaPlayerPrivateGStreamer::sourceChangedCallback\n");
     player->sourceChanged();
 }
 
@@ -2206,6 +2291,90 @@ GstElement* MediaPlayerPrivateGStreamer::audioSink() const
     return sink;
 }
 
+// #ifdef RDK_COMCAST_VIPER
+void MediaPlayerPrivateGStreamer::setupListeners() {
+    setStreamVolumeElement(GST_STREAM_VOLUME(m_pipeline.get()));
+
+    GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(m_pipeline.get())));
+    gst_bus_set_sync_handler(bus.get(), [](GstBus*, GstMessage* message, gpointer userData) {
+        auto& player = *static_cast<MediaPlayerPrivateGStreamer*>(userData);
+
+        if (player.handleSyncMessage(message)) {
+            gst_message_unref(message);
+            return GST_BUS_DROP;
+        }
+
+        return GST_BUS_PASS;
+    }, this, nullptr);
+
+    // Let also other listeners subscribe to (application) messages in this bus.
+    gst_bus_add_signal_watch_full(bus.get(), G_PRIORITY_HIGH + 30);
+    g_signal_connect(bus.get(), "message", G_CALLBACK(busMessageCallback), this);
+
+    g_object_set(m_pipeline.get(), "mute", m_player->muted(), nullptr);
+
+    // If we load a MediaSource later, we will also listen the signals from
+    // WebKitMediaSrc, which will be connected later in sourceChanged()
+    // METRO FIXME: In that case, we shouldn't listen to these signals coming from playbin, or the callbacks will be called twice.
+    g_signal_connect_swapped(m_pipeline.get(), "notify::source", G_CALLBACK(sourceChangedCallback), this);
+    g_signal_connect_swapped(m_pipeline.get(), "video-changed", G_CALLBACK(videoChangedCallback), this);
+    g_signal_connect_swapped(m_pipeline.get(), "audio-changed", G_CALLBACK(audioChangedCallback), this);
+
+#if !USE(HOLE_PUNCH_GSTREAMER)
+    // If we are using the gstreamer hole punch then we rely on autovideosink
+    // to use the appropriate sink
+
+    g_object_set(m_pipeline.get(), "video-sink", createVideoSink(), nullptr);
+
+    GRefPtr<GstPad> videoSinkPad = adoptGRef(gst_element_get_static_pad(m_videoSink.get(), "sink"));
+    if (videoSinkPad)
+        g_signal_connect_swapped(videoSinkPad.get(), "notify::caps", G_CALLBACK(videoSinkCapsChangedCallback), this);
+#endif
+
+#if USE(WESTEROS_SINK) && USE(HOLE_PUNCH_GSTREAMER)
+    GRefPtr<GstElementFactory> westerosfactory = adoptGRef(gst_element_factory_find("westerossink"));
+
+    m_videoSink = gst_element_factory_create(westerosfactory.get(), "WesterosVideoSink");
+    g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
+    g_object_set(G_OBJECT(m_videoSink.get()), "zorder",0.0f, nullptr);
+#endif
+
+#if PLATFORM(QCOM_DB)
+    m_videoSink = gst_element_factory_make( "db410csink", "optimized vsink");
+    g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
+#endif
+
+#if !USE(WESTEROS_SINK) && !USE(FUSION_SINK)
+    g_object_set(m_pipeline.get(), "audio-sink", createAudioSink(), nullptr);
+#endif
+    configurePlaySink();
+
+    // On 1.4.2 and newer we use the audio-filter property instead.
+    // See https://bugzilla.gnome.org/show_bug.cgi?id=735748 for
+    // the reason for using >= 1.4.2 instead of >= 1.4.0.
+    if (m_preservesPitch && webkitGstCheckVersion(1, 4, 2)) {
+        GstElement* scale = gst_element_factory_make("scaletempo", 0);
+
+        if (!scale)
+            GST_WARNING("Failed to create scaletempo");
+        else
+            g_object_set(m_pipeline.get(), "audio-filter", scale, nullptr);
+    }
+
+    if (!m_player->client().mediaPlayerRenderingCanBeAccelerated(m_player)) {
+        // If not using accelerated compositing, let GStreamer handle
+        // the image-orientation tag.
+        GstElement* videoFlip = gst_element_factory_make("videoflip", nullptr);
+        if (!videoFlip)
+            GST_WARNING("Failed to create videoflip");
+        else {
+            g_object_set(videoFlip, "method", 8, nullptr);
+            g_object_set(m_pipeline.get(), "video-filter", videoFlip, nullptr);
+        }
+    }
+}
+// #endif // RDK_COMCAST_VIPER
+
 void MediaPlayerPrivateGStreamer::createGSTPlayBin()
 {
     ASSERT(!m_pipeline);
@@ -2220,13 +2389,13 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
 #else
     unsigned flagText = 0x0;
 #endif
-    
+
     unsigned flagAudio = getGstPlayFlag("audio");
     unsigned flagVideo = getGstPlayFlag("video");
-    
-#if ENABLE(NATIVE_VIDEO)    
+
+#if ENABLE(NATIVE_VIDEO)
     unsigned flagNativeVideo = getGstPlayFlag("native-video");
-#else    
+#else
     unsigned flagNativeVideo = 0x0;
 #endif
 
@@ -2235,7 +2404,7 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
 #else
     unsigned flagNativeAudio = 0x0;
 #endif
-    
+
     g_object_set(m_pipeline.get(), "flags", flagText | flagAudio | flagVideo | flagNativeVideo | flagNativeAudio, nullptr);
 
     GRefPtr<GstBus> bus = adoptGRef(gst_pipeline_get_bus(GST_PIPELINE(m_pipeline.get())));
@@ -2306,6 +2475,11 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
 #else
         g_signal_connect_swapped(m_videoSink.get(), "first-video-frame-callback", G_CALLBACK(onFirstVideoFrameCallback), this);
 #endif // PLATFORM(INTEL_CE)
+#endif
+
+#if PLATFORM(QCOM_DB)
+    m_videoSink = gst_element_factory_make( "db410csink", "optimized vsink");
+    g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
 #endif
 
 #if !USE(WESTEROS_SINK) && !USE(FUSION_SINK)

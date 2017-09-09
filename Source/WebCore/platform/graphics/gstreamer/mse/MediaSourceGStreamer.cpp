@@ -48,10 +48,21 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/glib/GRefPtr.h>
 
+//#ifdef VIPER
+//#include <sys/time.h>
+//#endif
+
 namespace WebCore {
 
 void MediaSourceGStreamer::open(MediaSourcePrivateClient& mediaSource, MediaPlayerPrivateGStreamerMSE& playerPrivate)
 {
+    // TODO: This deadlocks on the time print..
+    // struct timeval te;
+    // gettimeofday(&te, NULL); // get current time
+    // long long milliseconds = te.tv_sec*1000LL + te.tv_usec/1000; // caculate milliseconds
+    //printf("MediaSourceGStreamer::open mediaSource.setPrivateAndOpen %s milliseconds: %lld\n", milliseconds);
+    printf("MediaSourceGStreamer::open mediaSource.setPrivateAndOpen\n");
+
     mediaSource.setPrivateAndOpen(adoptRef(*new MediaSourceGStreamer(mediaSource, playerPrivate)));
 }
 
