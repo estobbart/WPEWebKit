@@ -150,6 +150,11 @@ private:
 
     void createGSTPlayBin();
 
+//#ifdef RDK_COMCAST_VIPER
+    static GstElement* createGSTViperPlayBin();
+    void setupListeners();
+//#endif
+
     bool loadNextLocation();
     void mediaLocationChanged(GstMessage*);
 
@@ -254,6 +259,10 @@ private:
     HashMap<AtomicString, RefPtr<InbandMetadataTextTrackPrivateGStreamer>> m_metadataTracks;
 #endif
     virtual bool isMediaSource() const { return false; }
+// Global Viper PlaybackPipeline
+// #ifdef RDK_COMCAST_VIPER
+    static GstElement * gViperPipelinePtr;
+// #endif
 };
 }
 
