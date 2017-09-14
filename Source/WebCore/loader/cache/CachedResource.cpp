@@ -65,11 +65,17 @@ using namespace WTF;
 
 namespace WebCore {
 
+// During the video playback startup the web app usually initiates lots of resource loading.
+// We use load start/complete as a checkpoint to provide parsed startup media frames
+// to MSE source buffers and playback pipeline.
+void flushActiveStartupBuffers();
+
 ResourceLoadPriority CachedResource::defaultPriorityForResourceType(Type type)
 {
     switch (type) {
     case CachedResource::MainResource:
         return ResourceLoadPriority::VeryHigh;
+    case CachedResource::RawResource:
     case CachedResource::CSSStyleSheet:
         return ResourceLoadPriority::High;
     case CachedResource::Script:
@@ -78,7 +84,6 @@ ResourceLoadPriority CachedResource::defaultPriorityForResourceType(Type type)
 #endif
     case CachedResource::MediaResource:
     case CachedResource::FontResource:
-    case CachedResource::RawResource:
         return ResourceLoadPriority::Medium;
     case CachedResource::ImageResource:
         return ResourceLoadPriority::Low;
@@ -264,6 +269,8 @@ void CachedResource::load(CachedResourceLoader& cachedResourceLoader)
         m_fragmentIdentifierForRequest = String();
     }
 
+    flushActiveStartupBuffers();
+
     m_loader = platformStrategies()->loaderStrategy()->loadResource(frame, *this, request, m_options);
     if (!m_loader) {
         RELEASE_LOG_IF_ALLOWED("load: Unable to create SubresourceLoader (frame = %p)", &frame);
@@ -303,6 +310,8 @@ void CachedResource::checkNotify()
 {
     if (isLoading() || stillNeedsLoad())
         return;
+
+    flushActiveStartupBuffers();
 
     CachedResourceClientWalker<CachedResourceClient> walker(m_clients);
     while (CachedResourceClient* client = walker.next())

@@ -64,6 +64,8 @@ using namespace WebCore;
 
 namespace WebKit {
 
+void throttleUpdatesForNextThreeSeconds();
+
 WebLoaderStrategy::WebLoaderStrategy()
     : m_internallyFailedLoadTimer(RunLoop::main(), this, &WebLoaderStrategy::internallyFailedLoadTimerFired)
 {
@@ -192,6 +194,16 @@ void WebLoaderStrategy::scheduleLoad(ResourceLoader& resourceLoader, CachedResou
         return;
     }
 #endif
+
+    static bool enableThrottleHack = false;
+    if (resource->type() == CachedResource::MainResource && resourceLoader.request().url().string().contains("youtube.com"))
+    {
+        enableThrottleHack = true;
+    }
+    if (enableThrottleHack && resourceLoader.request().url().string().contains("get_video_info"))
+    {
+        throttleUpdatesForNextThreeSeconds();
+    }
 
     LOG(NetworkScheduling, "(WebProcess) WebLoaderStrategy::scheduleLoad, url '%s' will be scheduled with the NetworkProcess with priority %d", resourceLoader.url().string().latin1().data(), static_cast<int>(resourceLoader.request().priority()));
 

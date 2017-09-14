@@ -236,6 +236,7 @@ private:
     unsigned m_timeoutMilliseconds { 0 };
     std::chrono::steady_clock::time_point m_sendingTime;
     Timer m_timeoutTimer;
+    String m_textResponceCache;
 };
 
 inline auto XMLHttpRequest::responseType() const -> ResponseType

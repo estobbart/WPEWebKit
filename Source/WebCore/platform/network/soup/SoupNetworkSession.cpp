@@ -119,7 +119,7 @@ SoupNetworkSession::SoupNetworkSession(SoupCookieJar* cookieJar)
     // the rule "Do What Every Other Modern Browser Is Doing". They seem
     // to significantly improve page loading time compared to soup's
     // default values.
-    static const int maxConnections = 17;
+    static const int maxConnections = 34;
     static const int maxConnectionsPerHost = 6;
 
     GRefPtr<SoupCookieJar> jar = cookieJar;

@@ -96,9 +96,14 @@ static gboolean webKitMediaOpenCDMDecryptorHandleKeyResponse(WebKitMediaCommonEn
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(WEBKIT_OPENCDM_DECRYPT(self));
     ASSERT(temporarySession);
 
-    priv->m_session = temporarySession.get();
-    priv->m_openCdm = std::make_unique<media::OpenCdm>();
-    priv->m_openCdm->SelectSession(priv->m_session.utf8().data());
+    if(priv->m_session != temporarySession.get() ) {
+        priv->m_session = temporarySession.get();
+        GST_WARNING_OBJECT(self, "selecting session %s", priv->m_session.utf8().data());
+        priv->m_openCdm = std::make_unique<media::OpenCdm>();
+        priv->m_openCdm->SelectSession(priv->m_session.utf8().data());
+    }else{
+        GST_WARNING_OBJECT(self, "session already selected! %s", priv->m_session.utf8().data());
+    }
     return true;
 }
 
@@ -131,6 +136,7 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
         }
 
         GUniquePtr<GstByteReader> reader(gst_byte_reader_new(subSamplesMap.data, subSamplesMap.size));
+
         uint16_t inClear = 0;
         uint32_t inEncrypted = 0;
         uint32_t totalEncrypted = 0;
@@ -143,41 +149,45 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
         }
         gst_byte_reader_set_pos(reader.get(), 0);
 
-        // Build a new buffer storing the entire encrypted cipher.
-        GUniquePtr<uint8_t> holdEncryptedData(reinterpret_cast<uint8_t*>(malloc(totalEncrypted)));
-        uint8_t* encryptedData = holdEncryptedData.get();
-        unsigned index = 0;
-        for (position = 0; position < subSampleCount; position++) {
-            gst_byte_reader_get_uint16_be(reader.get(), &inClear);
-            gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
-            memcpy(encryptedData, map.data + index + inClear, inEncrypted);
-            index += inClear + inEncrypted;
-            encryptedData += inEncrypted;
+        if (totalEncrypted > 0)
+        {
+            // Build a new buffer storing the entire encrypted cipher.
+            GUniquePtr<uint8_t> holdEncryptedData(reinterpret_cast<uint8_t*>(malloc(totalEncrypted)));
+            uint8_t* encryptedData = holdEncryptedData.get();
+            unsigned index = 0;
+            for (position = 0; position < subSampleCount; position++) {
+                gst_byte_reader_get_uint16_be(reader.get(), &inClear);
+                gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
+                memcpy(encryptedData, map.data + index + inClear, inEncrypted);
+                index += inClear + inEncrypted;
+                encryptedData += inEncrypted;
+            }
+            gst_byte_reader_set_pos(reader.get(), 0);
+
+            // Decrypt cipher.
+            if (errorCode = priv->m_openCdm->Decrypt(holdEncryptedData.get(), static_cast<uint32_t>(totalEncrypted),
+                ivMap.data, static_cast<uint32_t>(ivMap.size))) {
+                GST_WARNING_OBJECT(self, "ERROR - packet decryption failed [%d]", errorCode);
+                gst_buffer_unmap(subSamplesBuffer, &subSamplesMap);
+                returnValue = false;
+                goto beach;
+            }
+
+            // Re-build sub-sample data.
+            index = 0;
+            encryptedData = holdEncryptedData.get();
+            unsigned total = 0;
+            for (position = 0; position < subSampleCount; position++) {
+                gst_byte_reader_get_uint16_be(reader.get(), &inClear);
+                gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
+
+                memcpy(map.data + total + inClear, encryptedData + index, inEncrypted);
+                index += inEncrypted;
+                total += inClear + inEncrypted;
+            }
+        } else {
+            GST_ERROR_OBJECT(self, "totalEncrypted is 0, not calling decrypt() !");
         }
-        gst_byte_reader_set_pos(reader.get(), 0);
-
-        // Decrypt cipher.
-        if (errorCode = priv->m_openCdm->Decrypt(holdEncryptedData.get(), static_cast<uint32_t>(totalEncrypted),
-            ivMap.data, static_cast<uint32_t>(ivMap.size))) {
-            GST_WARNING_OBJECT(self, "ERROR - packet decryption failed [%d]", errorCode);
-            gst_buffer_unmap(subSamplesBuffer, &subSamplesMap);
-            returnValue = false;
-            goto beach;
-        }
-
-        // Re-build sub-sample data.
-        index = 0;
-        encryptedData = holdEncryptedData.get();
-        unsigned total = 0;
-        for (position = 0; position < subSampleCount; position++) {
-            gst_byte_reader_get_uint16_be(reader.get(), &inClear);
-            gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
-
-            memcpy(map.data + total + inClear, encryptedData + index, inEncrypted);
-            index += inEncrypted;
-            total += inClear + inEncrypted;
-        }
-
         gst_buffer_unmap(subSamplesBuffer, &subSamplesMap);
     } else {
         // Decrypt cipher.

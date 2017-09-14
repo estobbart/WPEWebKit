@@ -174,7 +174,7 @@ void CompositingRunLoop::updateCompleted()
         return;
 
     if (m_updateState.compareExchangeStrong(UpdateState::PendingAfterCompletion, UpdateState::InProgress) == UpdateState::PendingAfterCompletion) {
-        m_updateTimer.startOneShot(0);
+        startUpdateTimer();
         return;
     }
 
@@ -184,6 +184,35 @@ void CompositingRunLoop::updateCompleted()
 void CompositingRunLoop::updateTimerFired()
 {
     m_updateFunction();
+    m_updateTime = monotonicallyIncreasingTime();
+}
+
+static double g_throttleStartTime = -1.;
+void throttleUpdatesForNextThreeSeconds()
+{
+    g_throttleStartTime= monotonicallyIncreasingTime();
+}
+
+void CompositingRunLoop::startUpdateTimer()
+{
+    if (m_updateTimer.isActive())
+        return;
+
+    static const bool disableUpdateThrottling = !!getenv("WPE_DISABLE_COMPOSITOR_THROTTLING");
+    if (disableUpdateThrottling) {
+        m_updateTimer.startOneShot(0);
+        return;
+    }
+
+    if (g_throttleStartTime > 0 && (monotonicallyIncreasingTime() - g_throttleStartTime) < 3.0) {
+        m_updateTimer.startOneShot(0.25);
+        return;
+    }
+    g_throttleStartTime= -1;
+
+    static const double MinimalTimeoutForAnimations = 1. / 30.;
+    double nextUpdate = std::max<double>(0., MinimalTimeoutForAnimations - monotonicallyIncreasingTime() + m_updateTime);
+    m_updateTimer.startOneShot(nextUpdate);
 }
 
 #ifndef NDEBUG

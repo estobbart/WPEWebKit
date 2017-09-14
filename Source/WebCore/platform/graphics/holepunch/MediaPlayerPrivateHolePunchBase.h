@@ -61,11 +61,11 @@ public:
     virtual void setVisible(bool) override { }
     virtual void setSize(const IntSize&) override;
 
-    virtual void paint(GraphicsContext&, const FloatRect&) override { };
+    virtual void paint(GraphicsContext&, const FloatRect&) override;
 
 #if USE(COORDINATED_GRAPHICS_THREADED)
     virtual PlatformLayer* platformLayer() const override { return const_cast<MediaPlayerPrivateHolePunchBase*>(this); }
-    virtual bool supportsAcceleratedRendering() const override { return true; }
+    virtual bool supportsAcceleratedRendering() const override { return false; }
     virtual RefPtr<TextureMapperPlatformLayerProxy> proxy() const override { return m_platformLayerProxy.copyRef(); }
     virtual void swapBuffersIfNeeded() override { };
 #endif

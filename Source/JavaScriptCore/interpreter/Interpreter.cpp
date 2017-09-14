@@ -506,6 +506,9 @@ private:
 
 void Interpreter::getStackTrace(Vector<StackFrame>& results, size_t framesToSkip, size_t maxStackSize)
 {
+    if (Options::disableStackTrace())
+        return;
+
     VM& vm = m_vm;
     CallFrame* callFrame = vm.topCallFrame;
     if (!callFrame)

@@ -54,6 +54,13 @@
 #include "PlayreadySession.h"
 #endif
 
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) || ENABLE(LEGACY_ENCRYPTED_MEDIA)
+#if USE(OPENCDM)
+#include "CDMPrivateOpenCDM.h"
+#include "CDMSessionOpenCDM.h"
+#endif
+#endif
+
 static const char* dumpReadyState(WebCore::MediaPlayer::ReadyState readyState)
 {
     switch (readyState) {
@@ -115,6 +122,9 @@ MediaPlayerPrivateGStreamerMSE::MediaPlayerPrivateGStreamerMSE(MediaPlayer* play
 MediaPlayerPrivateGStreamerMSE::~MediaPlayerPrivateGStreamerMSE()
 {
     GST_TRACE("destroying the player (%p)", this);
+
+    if (m_mediaSourceClient)
+        m_mediaSourceClient->clearPlayerPrivate();
 
     for (auto iterator : m_appendPipelinesMap)
         iterator.value->clearPlayerPrivate();
@@ -320,18 +330,29 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
     // This condition on m_readyState must match the conditions which trigger completeSeek() in
     // MediaSource::monitorSourceBuffers().
     if (!isTimeBuffered(seekTime) || m_readyState < MediaPlayer::HaveCurrentData) {
-        GST_DEBUG("[Seek] Delaying the seek: MSE is not ready");
-        GstStateChangeReturn setStateResult = gst_element_set_state(m_pipeline.get(), GST_STATE_PAUSED);
-        if (setStateResult == GST_STATE_CHANGE_FAILURE) {
-            GST_DEBUG("[Seek] Cannot seek, failed to pause playback pipeline.");
-            webKitMediaSrcSetReadyForSamples(WEBKIT_MEDIA_SRC(m_source.get()), true);
-            m_seeking = false;
-            return false;
+        m_mediaSourceClient->setStartupBufferingComplete(false);
+
+        m_mseSeekCompleted=true;
+        m_mediaSource->seekToTime(seekTime);
+        if (m_mseSeekCompleted == false)
+        {
+            GST_DEBUG("[Seek] Delaying the seek: MSE is not ready");
+            m_readyState = MediaPlayer::HaveMetadata;
+            GstStateChangeReturn setStateResult = gst_element_set_state(m_pipeline.get(), GST_STATE_PAUSED);
+            if (setStateResult == GST_STATE_CHANGE_FAILURE) {
+                GST_WARNING("[Seek] Cannot seek, failed to pause playback pipeline.");
+                webKitMediaSrcSetReadyForSamples(WEBKIT_MEDIA_SRC(m_source.get()), true);
+                m_seeking = false;
+                return false;
+            }
+            return true;
         }
-        m_readyState = MediaPlayer::HaveMetadata;
-        notifySeekNeedsDataForTime(seekTime);
-        ASSERT(!m_mseSeekCompleted);
-        return true;
+        else
+        {
+            GST_DEBUG("[Seek] The seek time seems to be not buffered yet,"
+                      " but media source says OK to continue the seek,"
+                      " seekTime=%f", seekTime.toDouble());
+        }
     }
 
     // Complete previous MSE seek if needed.
@@ -405,6 +426,7 @@ void MediaPlayerPrivateGStreamerMSE::maybeFinishSeek()
     // Right now we can use m_seekTime as a fallback.
     m_canFallBackToLastFinishedSeekPosition = true;
     timeChanged();
+    m_player->readyStateChanged();
 }
 
 void MediaPlayerPrivateGStreamerMSE::updatePlaybackRate()
@@ -448,6 +470,9 @@ void MediaPlayerPrivateGStreamerMSE::setReadyState(MediaPlayer::ReadyState ready
         bool ok = changePipelineState(GST_STATE_PAUSED);
         GST_TRACE("Changed pipeline to PAUSED: %s", ok ? "Success" : "Error");
     }
+
+    if (m_readyState == MediaPlayer::HaveEnoughData && m_mediaSourceClient)
+        m_mediaSourceClient->setStartupBufferingComplete(true);
 }
 
 void MediaPlayerPrivateGStreamerMSE::waitForSeekCompleted()
@@ -697,6 +722,9 @@ bool MediaPlayerPrivateGStreamerMSE::playbackPipelineHasFutureData() const
 
 void MediaPlayerPrivateGStreamerMSE::setMediaSourceClient(Ref<MediaSourceClientGStreamerMSE> client)
 {
+    if (m_mediaSourceClient)
+        m_mediaSourceClient->clearPlayerPrivate();
+
     m_mediaSourceClient = client.ptr();
 }
 
@@ -865,14 +893,37 @@ void MediaPlayerPrivateGStreamerMSE::emitPlayReadySession(PlayreadySession* sess
     if (!session->ready())
         return;
 
-    for (auto it : m_appendPipelinesMap)
-        if (session->hasPipeline(it.value->pipeline())) {
-            gst_element_send_event(it.value->pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
-                gst_structure_new("playready-session", "session", G_TYPE_POINTER, session, nullptr)));
-            it.value->setAppendState(AppendPipeline::AppendState::Ongoing);
-        }
+    for (auto it : m_appendPipelinesMap){
+        gst_element_send_event(it.value->pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
+            gst_structure_new("playready-session", "session", G_TYPE_POINTER, session, nullptr)));
+        it.value->setAppendState(AppendPipeline::AppendState::Ongoing);
+    }
 }
 #endif
+#endif
+
+#if (ENABLE(LEGACY_ENCRYPTED_MEDIA) || ENABLE(LEGACY_ENCRYPTED_MEDIA_V1)) && USE(OPENCDM)
+void MediaPlayerPrivateGStreamerMSE::emitOpenCDMSession()
+{
+    if (!m_cdmSession)
+        return;
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA)
+    CDMSessionOpenCDM* cdmSession = static_cast<CDMSessionOpenCDM*>(m_cdmSession);
+#else
+    CDMSessionOpenCDM* cdmSession = static_cast<CDMSessionOpenCDM*>(m_cdmSession.get());
+#endif // ENABLE(LEGACY_ENCRYPTED_MEDIA)
+    const String& sessionId = cdmSession->sessionId();
+    if (sessionId.isEmpty())
+        return;
+
+    for (auto it : m_appendPipelinesMap)
+    {
+            gst_element_send_event(it.value->pipeline(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
+                gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr)));
+            it.value->setAppendState(AppendPipeline::AppendState::Ongoing);
+    }
+    GST_DEBUG("emitted OCDM session on pipeline");
+}
 #endif
 
 void MediaPlayerPrivateGStreamerMSE::markEndOfStream(MediaSourcePrivate::EndOfStreamStatus status)

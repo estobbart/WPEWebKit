@@ -34,6 +34,7 @@
 
 #if ENABLE(MEDIA_SOURCE)
 
+#include "ActiveDOMCallbackMicrotask.h"
 #include "AudioTrackList.h"
 #include "BufferSource.h"
 #include "Event.h"
@@ -543,6 +544,15 @@ ExceptionOr<void> SourceBuffer::appendBufferInternal(const unsigned char* data, 
 
     // 6. Asynchronously run the buffer append algorithm.
     m_appendBufferTimer.startOneShot(0);
+
+    // Add microtask to start append right after leaving current script context. Keep the timer active to check if append was aborted.
+    auto microtask = std::make_unique<ActiveDOMCallbackMicrotask>(MicrotaskQueue::mainThreadQueue(), *scriptExecutionContext(), [protectedThis = makeRef(*this)]() mutable {
+        if (protectedThis->m_appendBufferTimer.isActive()) {
+            protectedThis->m_appendBufferTimer.stop();
+            protectedThis->appendBufferTimerFired();
+        }
+    });
+    MicrotaskQueue::mainThreadQueue().append(WTFMove(microtask));
 
     reportExtraMemoryAllocated();
 
@@ -1060,9 +1070,9 @@ static void maximumBufferSizeDefaults(size_t& maxBufferSizeVideo, size_t& maxBuf
     }
 
     if (maxBufferSizeAudio == 0)
-        maxBufferSizeAudio = 3 * 1024 * 1024;
+        maxBufferSizeAudio = 2 * 1024 * 1024;
     if (maxBufferSizeVideo == 0)
-        maxBufferSizeVideo = 30 * 1024 * 1024;
+        maxBufferSizeVideo = 15 * 1024 * 1024;
     if (maxBufferSizeText == 0)
         maxBufferSizeText = 1 * 1024 * 1024;
 }
@@ -1791,6 +1801,21 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
     // duration set to the maximum of the current duration and the group end timestamp.
     if (m_groupEndTimestamp > m_source->duration())
         m_source->setDurationInternal(m_groupEndTimestamp);
+
+    // To avoid playback pipeline starvation start providing media data as soon as we can
+    const AtomicString& trackID = sample.trackID();
+    auto it = m_trackBufferMap.find(trackID);
+    if (it != m_trackBufferMap.end() && m_private->isReadyForMoreSamples(trackID))
+    {
+        TrackBuffer& trackBuffer = it->value;
+        if (trackBuffer.needsReenqueueing == false &&
+            trackBuffer.lastEnqueuedDecodeEndTime.isValid() &&
+            trackBuffer.lastDecodeTimestamp.isValid() &&
+            abs(trackBuffer.lastEnqueuedDecodeEndTime - trackBuffer.lastDecodeTimestamp) > MediaTime::createWithDouble(0.350) )
+        {
+            provideMediaData(trackBuffer, trackID);
+        }
+    }
 }
 
 bool SourceBuffer::hasAudio() const

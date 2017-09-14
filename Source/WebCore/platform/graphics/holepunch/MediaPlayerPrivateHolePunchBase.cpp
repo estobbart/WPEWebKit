@@ -75,4 +75,10 @@ void MediaPlayerPrivateHolePunchBase::setSize(const IntSize& size)
 {
     m_size = size;
 }
+
+void MediaPlayerPrivateHolePunchBase::paint(GraphicsContext& ctx, const FloatRect& rect)
+{
+    ctx.clearRect(rect);
+}
+
 }

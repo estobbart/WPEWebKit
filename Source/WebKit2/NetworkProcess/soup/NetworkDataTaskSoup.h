@@ -139,6 +139,7 @@ private:
     double m_startTime { 0 };
 #endif
     RunLoop::Timer<NetworkDataTaskSoup> m_timeoutSource;
+    int m_readPriority;
 };
 
 } // namespace WebKit

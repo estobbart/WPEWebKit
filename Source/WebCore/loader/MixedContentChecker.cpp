@@ -66,6 +66,7 @@ bool MixedContentChecker::canDisplayInsecureContent(SecurityOrigin* securityOrig
         return true;
 
     bool allowed = (m_frame.settings().allowDisplayOfInsecureContent() || type == ContentType::ActiveCanWarn) && !m_frame.document()->geolocationAccessed();
+    if (!allowed)
     logWarning(allowed, "display", url);
 
     if (allowed) {
@@ -82,6 +83,7 @@ bool MixedContentChecker::canRunInsecureContent(SecurityOrigin* securityOrigin, 
         return true;
 
     bool allowed = m_frame.settings().allowRunningOfInsecureContent() && !m_frame.document()->geolocationAccessed();
+    if (!allowed)
     logWarning(allowed, "run", url);
 
     if (allowed) {

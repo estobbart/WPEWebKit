@@ -70,6 +70,26 @@ StringView CachedScript::script()
     if (!m_data)
         return { };
 
+    static bool enableYTOverrides = !!getenv("WPE_ENABLE_YT_OVERRIDES");
+    if (enableYTOverrides && !m_script && m_decodingState == NeverDecoded
+        && !m_ytOverridesInjected
+        && origin() && origin()->host().contains("youtube.com")
+        && url().string().contains("live.js"))
+    {
+        Ref<SharedBuffer> newData = SharedBuffer::create();
+
+        const char* injectScript =
+            "window.environment.flags.new_horizontal_list=false;\n"
+            "window.environment.flags.new_shelf_list=true;\n"
+            "console.log(JSON.stringify(window.environment.flags,null,2));\n";
+
+        newData->append(injectScript, strlen(injectScript));
+
+        newData->append(*m_data);
+        m_data = WTFMove(newData);
+        m_ytOverridesInjected = true;
+    }
+
     if (m_decodingState == NeverDecoded
         && TextEncoding(encoding()).isByteBasedEncoding()
         && m_data->size()

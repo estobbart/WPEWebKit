@@ -552,6 +552,7 @@ private:
     bool m_hasPendingLayerFlush { false };
     bool m_layerNeedsCompositingUpdate { false };
     bool m_viewBackgroundIsTransparent { false };
+    bool m_enableYoutubeWorkarounds { false };
 
 #if !LOG_DISABLED
     int m_rootLayerUpdateCount { 0 };

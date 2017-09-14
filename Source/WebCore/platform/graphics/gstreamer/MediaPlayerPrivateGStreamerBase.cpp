@@ -701,6 +701,13 @@ FloatSize MediaPlayerPrivateGStreamerBase::naturalSize() const
         return FloatSize();
     }
 
+    // Sanity check for the unlikely, but reproducible case when getVideoSizeAndFormatFromCaps returns incorrect values
+    if ((originalSize.width() == 0) || (originalSize.height() == 0)
+       || (pixelAspectRatioNumerator == 0) || (pixelAspectRatioNumerator == 0)) {
+        GST_DEBUG("getVideoSizeAndFormatFromCaps returned an invalid info, returning an empty size");
+        return FloatSize();
+    }
+
 #if USE(TEXTURE_MAPPER_GL)
     // When using accelerated compositing, if the video is tagged as rotated 90 or 270 degrees, swap width and height.
     if (m_player->client().mediaPlayerRenderingCanBeAccelerated(m_player)) {
@@ -1596,7 +1603,7 @@ void MediaPlayerPrivateGStreamerBase::emitOpenCDMSession()
 
     bool eventHandled = gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
         gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr)));
-    GST_TRACE("emitted OpenCDM session on pipeline, event handled %s", eventHandled ? "yes" : "no");
+    GST_DEBUG("emitted OpenCDM session on pipeline, event handled %s", eventHandled ? "yes" : "no");
 }
 
 void MediaPlayerPrivateGStreamerBase::resetOpenCDMSession()
@@ -1732,8 +1739,10 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::generateKeyReque
         initDataVector.append(reinterpret_cast<const uint8_t*>(initDataPtr), initDataLength);
         LockHolder prSessionsLocker(m_prSessionsMutex);
         PlayreadySession* prSession = prSessionByInitData(initDataVector, true);
-        if (!prSession)
+        if (!prSession){
             GST_ERROR("prSession should already have been created when handling the protection events");
+            prSession = createPlayreadySession(initDataVector, nullptr, true);
+        }
         prSessionsLocker.unlockEarly();
 
         LockHolder locker(prSession->mutex());
