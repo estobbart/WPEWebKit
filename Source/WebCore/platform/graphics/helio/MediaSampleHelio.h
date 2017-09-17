@@ -2,7 +2,7 @@
 #define MediaSampleHelio_H
 
 #include "MediaSample.h"
-#include "demux/sample.h" // libhelio
+//#include "demux/sample.h" // libhelio
 
 #include <stdio.h>
 
@@ -15,15 +15,15 @@ namespace WebCore {
 class MediaSampleHelio final : public MediaSample {
 
 public:
-    static Ref<MediaSampleHelio> create(helio_sample_t *sample) {
+    static Ref<MediaSampleHelio> create(void *sample) {
         return adoptRef(*new MediaSampleHelio(sample));
     }
 
 private:
-    MediaSampleHelio(helio_sample_t *sample) {
+    MediaSampleHelio(void *sample) {
         m_sample = sample;
         //m_id = AtomicString(String::format("%i", m_sample->track_id));
-        m_id = AtomicString::number(m_sample->track_id);
+        m_id = AtomicString::number(0);
     }
 
     virtual ~MediaSampleHelio() { }
@@ -58,7 +58,7 @@ private:
     // RetainPtr<CMSampleBufferRef> m_sample;
     AtomicString m_id;
 
-    helio_sample_t *m_sample;
+    void *m_sample;
 };
 
 }

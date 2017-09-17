@@ -6,9 +6,9 @@
 
 namespace WebCore {
 
-AudioTrackPrivateHelio::AudioTrackPrivateHelio(helio_track_t *track)
+AudioTrackPrivateHelio::AudioTrackPrivateHelio(void *track)
 {
-    m_id = AtomicString::number(track->id);
+    //m_id = AtomicString::number(track->id);
 }
 
 } // namespace WebCore

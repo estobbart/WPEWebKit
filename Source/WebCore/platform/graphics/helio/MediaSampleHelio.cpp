@@ -13,23 +13,23 @@ namespace WebCore {
 
 MediaTime MediaSampleHelio::presentationTime() const {
     // printf("presentationTime\n");
-    return MediaTime::createWithDouble(m_sample->pts * m_sample->scale);
+    return MediaTime::createWithDouble(0);
     //return toMediaTime(CMSampleBufferGetPresentationTimeStamp(m_sample.get()));
 }
 
 MediaTime MediaSampleHelio::decodeTime() const {
     // printf("decodeTime\n");
-    return MediaTime::createWithDouble(m_sample->pts * m_sample->scale);
+    return MediaTime::createWithDouble(0);
 }
 
 MediaTime MediaSampleHelio::duration() const {
     // printf("duration\n");
-    return MediaTime::createWithDouble(m_sample->duration * m_sample->scale);
+    return MediaTime::createWithDouble(0);
 }
 
 size_t MediaSampleHelio::sizeInBytes() const {
     printf("sizeInBytes\n");
-    return m_sample->size;
+    return 0;//m_sample->size;
 }
 
 FloatSize MediaSampleHelio::presentationSize() const {
@@ -48,7 +48,7 @@ void MediaSampleHelio::setTimestamps(const MediaTime &mediaTimeOne __attribute__
 
 bool MediaSampleHelio::isDivisable() const {
     printf("isDivisable\n");
-    return true;
+    return false;
 }
 
 std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> MediaSampleHelio::divide(const MediaTime& presentationTime __attribute__((unused))) {
@@ -58,7 +58,7 @@ std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> MediaSampleHelio::divide(con
 
 Ref<MediaSample> MediaSampleHelio::createNonDisplayingCopy() const {
     printf("createNonDisplayingCopy\n");
-    return MediaSampleHelio::create(m_sample);
+    return MediaSampleHelio::create(NULL);
 }
 
 MediaSample::SampleFlags MediaSampleHelio::flags() const {

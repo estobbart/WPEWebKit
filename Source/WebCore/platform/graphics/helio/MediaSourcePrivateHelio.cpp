@@ -53,10 +53,11 @@ MediaSourcePrivate::AddStatus MediaSourcePrivateHelio::addSourceBuffer(const Con
   // parameters.codecs = contentType.parameter(ASCIILiteral("codecs"));
   // if (MediaPlayerPrivateHelio::supportsType(parameters) == MediaPlayer::IsNotSupported)
   //     return MediaSourcePrivate::NotSupported;
-  if (m_sourceBuffers.size()) {
-      // TODO: Until we add MP4 support
-      return MediaSourcePrivate::ReachedIdLimit;
-  }
+
+  // if (m_sourceBuffers.size()) {
+  //     // TODO: Until we add MP4 support
+  //     return MediaSourcePrivate::ReachedIdLimit;
+  // }
 
   m_sourceBuffers.append(SourceBufferPrivateHelio::create(this));
   sourceBufferPrivate = m_sourceBuffers.last();

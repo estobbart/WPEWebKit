@@ -34,7 +34,9 @@ void MediaPlayerPrivateHelio::_getSupportedTypes(HashSet<String, ASCIICaseInsens
         // helio_enumerate_supported_mime_types(&cache, [](void *cache, const char *mime_type){
         //     cache->get().add(ASCIILiteral(mime_type));
         // });
-        cache.get().add(ASCIILiteral("video/mp2ts"));
+        //cache.get().add(ASCIILiteral("video/mp2ts"));
+        cache.get().add(ASCIILiteral("video/mp4"));
+        cache.get().add(ASCIILiteral("audio/mp4"));
     }
     supportedTypes = cache;
 }
@@ -60,7 +62,7 @@ MediaPlayer::SupportsType MediaPlayerPrivateHelio::_supportsType(const MediaEngi
       parameters.isMediaSource,
       parameters.isMediaStream);
 
-  if (!parameters.type.isEmpty() && parameters.type == "video/mp2ts") {
+  if (!parameters.type.isEmpty()){//  && parameters.type == "video/mp2ts") { // TODO:
       printf("MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported\n");
       // TODO: If we get a codec we can guarentee support, else it's maybe
       return MediaPlayer::MayBeSupported;
