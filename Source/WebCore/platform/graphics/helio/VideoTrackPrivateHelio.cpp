@@ -6,10 +6,10 @@
 
 namespace WebCore {
 
-VideoTrackPrivateHelio::VideoTrackPrivateHelio(helio_track_t *track)
+VideoTrackPrivateHelio::VideoTrackPrivateHelio(void *track)
 {
     //m_id = AtomicString(String::format("%i", track->id));
-    m_id = AtomicString::number(track->id);
+    m_id = AtomicString::number(0);
 }
 
 } // namespace WebCore

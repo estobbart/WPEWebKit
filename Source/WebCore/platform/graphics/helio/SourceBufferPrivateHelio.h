@@ -3,9 +3,9 @@
 
 #include "SourceBufferPrivate.h"
 
-#include "helio.h"
-#include "demux/track.h"
-#include "demux/sample.h"
+//#include "helio.h"
+//#include "demux/track.h"
+//#include "demux/sample.h"
 
 namespace WebCore {
 
@@ -55,11 +55,11 @@ public:
     void notifyClientWhenReadyForMoreSamples(AtomicString) override;
 
     // TODO: Is there a better way to hide these?
-    void trackInfoEventHandler(const SourceBufferPrivateClient::InitializationSegment& segment);
+    //void trackInfoEventHandler(const SourceBufferPrivateClient::InitializationSegment& segment);
 
-    void mediaSampleEventHandler(helio_sample_t **samples);
+    //void mediaSampleEventHandler(helio_sample_t **samples);
 
-    void demuxCompleteEventHandler();
+    //void demuxCompleteEventHandler();
 
 private:
 
@@ -67,7 +67,7 @@ private:
     MediaPlayer::ReadyState m_readyState;
 
     SourceBufferPrivateClient* m_client;
-    helio_t *m_helio;
+    //helio_t *m_helio;
     //HashMap<AtomicString, bool> m_trackNotifyMap;
 
 };

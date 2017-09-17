@@ -2,7 +2,7 @@
 #define MediaSampleHelio_H
 
 #include "MediaSample.h"
-#include "demux/sample.h" // libhelio
+//#include "demux/sample.h" // libhelio
 
 #include <stdio.h>
 
@@ -15,15 +15,15 @@ namespace WebCore {
 class MediaSampleHelio final : public MediaSample {
 
 public:
-    static Ref<MediaSampleHelio> create(helio_sample_t *sample) {
+    static Ref<MediaSampleHelio> create(void *sample) {
         return adoptRef(*new MediaSampleHelio(sample));
     }
 
 private:
-    MediaSampleHelio(helio_sample_t *sample) {
+    MediaSampleHelio(void *sample) {
         m_sample = sample;
         //m_id = AtomicString(String::format("%i", m_sample->track_id));
-        m_id = AtomicString::number(m_sample->track_id);
+        m_id = AtomicString::number(0);
     }
 
     virtual ~MediaSampleHelio() { }
@@ -44,21 +44,26 @@ private:
     // it's width, height if video
     FloatSize presentationSize() const override;
     void offsetTimestampsBy(const MediaTime&) override;
+    // TODO: When is setTimestamps called?
     void setTimestamps(const MediaTime&, const MediaTime&) override;
+    // TODO: Support division of the MP4
     bool isDivisable() const override;
     std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> divide(const MediaTime& presentationTime) override;
+    // TODO: What's a non-displaying copy for?
     Ref<MediaSample> createNonDisplayingCopy() const override;
 
-
+    // TODO: What's SampleFlasgs?
     SampleFlags flags() const override;
+    // TODO: Define PlatformSample for Helio
     PlatformSample platformSample() override;
 
+    // TODO: Support debug of the sample
     void dump(PrintStream&) const override;
 
     // RetainPtr<CMSampleBufferRef> m_sample;
     AtomicString m_id;
 
-    helio_sample_t *m_sample;
+    void *m_sample;
 };
 
 }
