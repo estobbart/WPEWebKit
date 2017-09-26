@@ -117,8 +117,8 @@ function callbacksAndDictionaryOverload(args, functionName, promiseMode, legacyM
     if (typeof successCallback !== "function")
         return @Promise.@reject(new @TypeError(`Argument 1 ('successCallback') to RTCPeerConnection.${functionName} must be a function`));
 
-    if (typeof errorCallback !== "function")
-        return @Promise.@reject(new @TypeError(`Argument 2 ('errorCallback') to RTCPeerConnection.${functionName} must be a function`));
+    //if (typeof errorCallback !== "function")
+    //    return @Promise.@reject(new @TypeError(`Argument 2 ('errorCallback') to RTCPeerConnection.${functionName} must be a function`));
 
     if (args.length > 2 && !@isDictionary(options))
         return @Promise.@reject(new @TypeError(`Argument 3 ('options') to RTCPeerConnection.${functionName} must be a Dictionary`));

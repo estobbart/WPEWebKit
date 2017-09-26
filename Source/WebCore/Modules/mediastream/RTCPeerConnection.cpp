@@ -33,21 +33,26 @@
 #include "config.h"
 #include "RTCPeerConnection.h"
 
+#include "Logging.h"
+
 #if ENABLE(WEB_RTC)
 
 #include "Document.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "Frame.h"
+#include "MediaConstraintsImpl.h"
 #include "MediaStream.h"
 #include "MediaStreamTrack.h"
 #include "RTCConfiguration.h"
 #include "RTCDataChannel.h"
+#include "RTCDataChannelHandler.h"
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateEvent.h"
 #include "RTCOfferAnswerOptions.h"
 #include "RTCSessionDescription.h"
 #include "RTCTrackEvent.h"
+#include "JSMediaDevicesCustom.h"
 #include "UUID.h"
 #include <wtf/MainThread.h>
 #include <wtf/text/Base64.h>
@@ -76,7 +81,7 @@ RTCPeerConnection::~RTCPeerConnection()
     stop();
 }
 
-ExceptionOr<void> RTCPeerConnection::initializeWith(Document& document, const Dictionary& rtcConfiguration)
+ExceptionOr<void> RTCPeerConnection::initializeWith(Document& document, const Dictionary& rtcConfiguration, const Dictionary& rtcConstraints)
 {
     if (!document.frame())
         return Exception { NOT_SUPPORTED_ERR };
@@ -84,7 +89,34 @@ ExceptionOr<void> RTCPeerConnection::initializeWith(Document& document, const Di
     if (!m_backend)
         return Exception { NOT_SUPPORTED_ERR };
 
+    MediaTrackConstraintSetMap mandatoryConstraintsMap;
+    Vector<MediaTrackConstraintSetMap> advancedConstraintsMaps;
+    parseMediaConstraintsDictionary(rtcConstraints, mandatoryConstraintsMap, advancedConstraintsMaps);
+
+    Ref<MediaConstraintsImpl> constraints = MediaConstraintsImpl::create(WTFMove(mandatoryConstraintsMap), WTFMove(advancedConstraintsMaps), true);
+    m_constraints = WTFMove(constraints);
     return setConfiguration(rtcConfiguration);
+}
+
+ExceptionOr<void> RTCPeerConnection::addStream(Ref<MediaStream>&& stream)
+{
+    if (m_signalingState == SignalingState::Closed)
+        return Exception { INVALID_STATE_ERR };
+
+    if (m_localStreams.contains(stream.ptr()))
+        return { };
+
+    Vector<std::reference_wrapper<MediaStream>> streams;
+    streams.append(stream);
+    for (auto& track : stream->getTracks())
+        addTrack(track.releaseNonNull(), streams);
+
+    return { };
+}
+
+Vector<RefPtr<MediaStream>> RTCPeerConnection::getRemoteStreams() const
+{
+    return m_backend->getRemoteStreams();
 }
 
 ExceptionOr<Ref<RTCRtpSender>> RTCPeerConnection::addTrack(Ref<MediaStreamTrack>&& track, const Vector<std::reference_wrapper<MediaStream>>& streams)
@@ -134,6 +166,12 @@ ExceptionOr<Ref<RTCRtpSender>> RTCPeerConnection::addTrack(Ref<MediaStreamTrack>
 
         sender = &transceiver->sender();
         m_transceiverSet->append(WTFMove(transceiver));
+    }
+
+    // Legacy mode
+    for (auto streamPtr : streams) {
+        if (!m_localStreams.contains(&streamPtr.get()))
+            m_localStreams.append(&streamPtr.get());
     }
 
     m_backend->markAsNeedingNegotiation();
@@ -214,6 +252,17 @@ void RTCPeerConnection::queuedCreateOffer(RTCOfferOptions&& options, SessionDesc
         promise.reject(INVALID_STATE_ERR);
         return;
     }
+
+    Vector<String> sv;
+    auto mandatoryConstraints = (*m_constraints).mandatoryConstraints();
+
+    Optional<StringConstraint> oscv = mandatoryConstraints.offerToReceiveVideo();
+    if(oscv)
+        options.offerToReceiveVideo = oscv->getIdeal(sv) && (sv.size() > 0) && (sv[0] == "true");
+
+    Optional<StringConstraint> osca = mandatoryConstraints.offerToReceiveAudio();
+    if(osca)
+        options.offerToReceiveAudio = osca->getIdeal(sv) && (sv.size() > 0) && (sv[0] == "true");
 
     m_backend->createOffer(WTFMove(options), WTFMove(promise));
 }
@@ -354,8 +403,8 @@ RTCConfiguration* RTCPeerConnection::getConfiguration() const
 
 ExceptionOr<void> RTCPeerConnection::setConfiguration(const Dictionary& configuration)
 {
-    if (configuration.isUndefinedOrNull())
-        return Exception { TypeError };
+    //if (configuration.isUndefinedOrNull())
+    //    return Exception { TypeError };
 
     if (m_signalingState == SignalingState::Closed)
         return Exception { INVALID_STATE_ERR };
@@ -365,7 +414,7 @@ ExceptionOr<void> RTCPeerConnection::setConfiguration(const Dictionary& configur
         return newConfiguration.releaseException();
 
     m_configuration = newConfiguration.releaseReturnValue();
-    m_backend->setConfiguration(*m_configuration);
+    m_backend->setConfiguration(*m_configuration, *m_constraints);
     return { };
 }
 
@@ -384,7 +433,12 @@ ExceptionOr<Ref<RTCDataChannel>> RTCPeerConnection::createDataChannel(ScriptExec
     if (!channelHandler)
         return Exception { NOT_SUPPORTED_ERR };
 
-    return RTCDataChannel::create(context, WTFMove(channelHandler), WTFMove(label), WTFMove(options));
+    RefPtr<RTCDataChannel> channel = RTCDataChannel::create(context, WTFMove(channelHandler), WTFMove(label), WTFMove(options));
+    if (!channel)
+        return Exception { NOT_SUPPORTED_ERR };
+
+    m_dataChannels.append(channel);
+    return channel.releaseNonNull();
 }
 
 void RTCPeerConnection::close()

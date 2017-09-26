@@ -574,6 +574,8 @@ HTMLMediaElement::~HTMLMediaElement()
 #endif
 
     m_seekTaskQueue.close();
+    m_generateKeyReqQueue.close();
+    m_addKeyQueue.close();
     m_promiseTaskQueue.close();
     m_pauseAfterDetachedTaskQueue.close();
     m_updatePlaybackControlsManagerQueue.close();
@@ -1070,6 +1072,8 @@ void HTMLMediaElement::setSrcObject(ScriptExecutionContext& context, MediaStream
     m_mediaStreamSrcObject = mediaStream;
     if (mediaStream)
         setSrc(DOMURL::createPublicURL(context, *mediaStream));
+    else
+        setSrc(WTF::emptyString());
 }
 #endif
 
@@ -3297,19 +3301,19 @@ ExceptionOr<void> HTMLMediaElement::webkitGenerateKeyRequest(const String& keySy
 
     if (!m_player)
         return Exception { INVALID_STATE_ERR };
+    
+    m_generateKeyReqQueue.enqueueTask([this, keySystem, customData, initData]  {
+    
+        const unsigned char* initDataPointer = nullptr;
+        unsigned initDataLength = 0;
+        if (initData) {
+            initDataPointer = initData->data();
+            initDataLength = initData->length();
+        }
 
-    const unsigned char* initDataPointer = nullptr;
-    unsigned initDataLength = 0;
-    if (initData) {
-        initDataPointer = initData->data();
-        initDataLength = initData->length();
-    }
-
-    MediaPlayer::MediaKeyException result = m_player->generateKeyRequest(keySystem, initDataPointer, initDataLength, customData);
-    fprintf(stderr, "HTMLMediaElement::webkitGenerateKeyRequest() result %d\n", result);
-    auto ec = exceptionCodeForMediaKeyException(result);
-    if (ec)
-        return Exception { ec };
+        MediaPlayer::MediaKeyException result = m_player->generateKeyRequest(keySystem, initDataPointer, initDataLength, customData);
+        fprintf(stderr, "HTMLMediaElement::webkitGenerateKeyRequest() result %d\n", result);
+    });
     return { };
 }
 
@@ -3332,17 +3336,18 @@ ExceptionOr<void> HTMLMediaElement::webkitAddKey(const String& keySystem, Uint8A
     if (!m_player)
         return Exception { INVALID_STATE_ERR };
 
-    const unsigned char* initDataPointer = nullptr;
-    unsigned initDataLength = 0;
-    if (initData) {
-        initDataPointer = initData->data();
-        initDataLength = initData->length();
-    }
+    m_addKeyQueue.enqueueTask([this, initData, keySystem, sessionId, key=RefPtr<Uint8Array>(&key)] {
+        const unsigned char* initDataPointer = nullptr;
+        unsigned initDataLength = 0;
+        if (initData) {
+            initDataPointer = initData->data();
+            initDataLength = initData->length();
+        }
 
-    MediaPlayer::MediaKeyException result = m_player->addKey(keySystem, key.data(), key.length(), initDataPointer, initDataLength, sessionId);
-    auto ec = exceptionCodeForMediaKeyException(result);
-    if (ec)
-        return Exception { ec };
+        MediaPlayer::MediaKeyException result = m_player->addKey(keySystem, key->data(), key->length(), initDataPointer, initDataLength, sessionId);
+        fprintf(stderr, "HTMLMediaElement::webkitAddKey() result %d\n", result);
+    });
+    
     return { };
 }
 
@@ -5253,6 +5258,8 @@ void HTMLMediaElement::stopWithoutDestroyingMediaPlayer()
 void HTMLMediaElement::contextDestroyed()
 {
     m_seekTaskQueue.close();
+    m_generateKeyReqQueue.close();
+    m_addKeyQueue.close();
     m_resizeTaskQueue.close();
     m_shadowDOMTaskQueue.close();
     m_promiseTaskQueue.close();

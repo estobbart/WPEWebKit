@@ -112,6 +112,16 @@ void WKContextConfigurationSetMediaKeysStorageDirectory(WKContextConfigurationRe
     toImpl(configuration)->setMediaKeysStorageDirectory(toImpl(mediaKeysStorageDirectory)->string());
 }
 
+WKStringRef WKContextConfigurationCopyMediaCacheDirectory(WKContextConfigurationRef configuration)
+{
+    return toCopiedAPI(toImpl(configuration)->mediaCacheDirectory());
+}
+
+void WKContextConfigurationSetMediaCacheDirectory(WKContextConfigurationRef configuration, WKStringRef mediaCacheDirectory)
+{
+    toImpl(configuration)->setMediaCacheDirectory(toImpl(mediaCacheDirectory)->string());
+}
+
 bool WKContextConfigurationFullySynchronousModeIsAllowedForTesting(WKContextConfigurationRef configuration)
 {
     return toImpl(configuration)->fullySynchronousModeIsAllowedForTesting();

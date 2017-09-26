@@ -30,7 +30,7 @@
 
 #pragma once
 
-#if ENABLE(WEB_RTC)
+#if ENABLE(WEB_RTC) && !USE(QT5WEBRTC)
 
 #include "MediaEndpoint.h"
 #include <owr/owr_session.h>

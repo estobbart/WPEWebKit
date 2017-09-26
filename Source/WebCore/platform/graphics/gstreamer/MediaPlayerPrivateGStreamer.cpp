@@ -79,6 +79,30 @@ using namespace std;
 
 namespace WebCore {
 
+double gEnterKeyDownTime = 0.0;
+
+void noticeEnterKeyDownEvent()
+{
+    gEnterKeyDownTime = WTF::monotonicallyIncreasingTimeMS();
+}
+
+void noticeFirstVideoFrame()
+{
+    if (gEnterKeyDownTime)
+    {
+        double diffTime = WTF::monotonicallyIncreasingTimeMS() - gEnterKeyDownTime;
+        gEnterKeyDownTime = 0.0;
+        WTFLogAlways("Media: browse-to-watch = %.2f ms\n", diffTime);
+    }
+}
+
+#if USE(WESTEROS_SINK) && USE(HOLE_PUNCH_GSTREAMER)
+static void onFirstVideoFrameCallback(MediaPlayerPrivateGStreamer* /*player*/)
+{
+    noticeFirstVideoFrame();
+}
+#endif
+
 static void busMessageCallback(GstBus*, GstMessage* message, MediaPlayerPrivateGStreamer* player)
 {
     player->handleMessage(message);
@@ -180,6 +204,9 @@ MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer(MediaPlayer* player)
 #if ENABLE(WEB_AUDIO)
     , m_audioSourceProvider(std::make_unique<AudioSourceProviderGStreamer>())
 #endif
+#if PLATFORM(BROADCOM)
+    , m_webkitAudioSink(0)
+#endif
 {
 #if USE(GLIB) && !PLATFORM(EFL)
     m_readyTimerHandler.setPriority(G_PRIORITY_DEFAULT_IDLE);
@@ -223,6 +250,10 @@ MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer()
     if (m_videoSink) {
         GRefPtr<GstPad> videoSinkPad = adoptGRef(gst_element_get_static_pad(m_videoSink.get(), "sink"));
         g_signal_handlers_disconnect_matched(videoSinkPad.get(), G_SIGNAL_MATCH_DATA, 0, 0, nullptr, nullptr, this);
+#if USE(WESTEROS_SINK) && USE(HOLE_PUNCH_GSTREAMER)
+        g_signal_handlers_disconnect_by_func(G_OBJECT(m_videoSink.get()),
+            reinterpret_cast<gpointer>(onFirstVideoFrameCallback), this);
+#endif
     }
 
     if (m_pipeline) {
@@ -447,6 +478,11 @@ bool MediaPlayerPrivateGStreamer::changePipelineState(GstState newState)
     if (currentState == newState || pending == newState) {
         GST_DEBUG("Rejected state change to %s from %s with %s pending", gst_element_state_get_name(newState),
             gst_element_state_get_name(currentState), gst_element_state_get_name(pending));
+        return true;
+    }
+
+    if (m_readyState <= MediaPlayer::HaveMetadata && newState == GST_STATE_PLAYING) {
+        GST_DEBUG("Rejected state change to playing, buffers are not ready yet");
         return true;
     }
 
@@ -1614,6 +1650,17 @@ void MediaPlayerPrivateGStreamer::updateStates()
                     m_networkState = MediaPlayer::Idle;
             }
 
+            // TODO:This is a temporary workaround for EOS event not being received by audio-sink
+            // This is a broadcom plugin issue and is expected to be fixed as part of BCOM-1927.
+            // Get rid of this, once the fix for BCOM-1927 is available.
+#if PLATFORM(BROADCOM)
+            if (!m_webkitAudioSink) {
+                g_object_get(m_pipeline.get(), "audio-sink", &m_webkitAudioSink, NULL);
+                if (m_webkitAudioSink && g_strrstr (GST_ELEMENT_NAME(m_webkitAudioSink.get()), "brcmaudiosink"))
+                    g_object_set(G_OBJECT(m_webkitAudioSink.get()), "async", TRUE, NULL);
+            }
+#endif
+
             break;
         default:
             ASSERT_NOT_REACHED();
@@ -2252,6 +2299,17 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin()
     m_videoSink = gst_element_factory_create(westerosfactory.get(), "WesterosVideoSink");
     g_object_set(m_pipeline.get(), "video-sink", m_videoSink.get(), nullptr);
     g_object_set(G_OBJECT(m_videoSink.get()), "zorder",0.0f, nullptr);
+
+#if USE(SVP)
+    g_object_set(G_OBJECT(m_videoSink.get()), "secure-video",true, nullptr);
+#endif
+
+    if (m_videoSink)
+#if PLATFORM(INTEL_CE)
+        g_signal_connect_swapped(m_videoSink.get(), "firstframe-callback", G_CALLBACK(onFirstVideoFrameCallback), this);
+#else
+        g_signal_connect_swapped(m_videoSink.get(), "first-video-frame-callback", G_CALLBACK(onFirstVideoFrameCallback), this);
+#endif // PLATFORM(INTEL_CE)
 #endif
 
 #if !USE(WESTEROS_SINK) && !USE(FUSION_SINK)

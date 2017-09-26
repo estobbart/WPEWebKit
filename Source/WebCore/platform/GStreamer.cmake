@@ -174,6 +174,11 @@ if (ENABLE_LEGACY_ENCRYPTED_MEDIA_V1 OR ENABLE_LEGACY_ENCRYPTED_MEDIA OR ENABLE_
             platform/graphics/gstreamer/eme/WebKitOpenCDMPlayReadyDecryptorGStreamer.cpp
             platform/graphics/gstreamer/eme/WebKitOpenCDMWidevineDecryptorGStreamer.cpp
         )
+        if (ENABLE_SVP)
+            list(APPEND WebCore_LIBRARIES
+                -lbrcmsvpmeta -lb_secbuf
+            )
+        endif ()	
     endif ()
 endif ()
 

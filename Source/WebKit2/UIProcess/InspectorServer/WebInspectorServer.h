@@ -52,6 +52,8 @@ private:
     WebInspectorServer();
     ~WebInspectorServer();
 
+    bool isLocalHost(int pageId);
+
     // WebSocketServerClient implementation. Events coming from remote connections.
     void didReceiveUnrecognizedHTTPRequest(WebSocketServerConnection*, PassRefPtr<HTTPRequest>) final;
     bool didReceiveWebSocketUpgradeHTTPRequest(WebSocketServerConnection*, PassRefPtr<HTTPRequest>) final;

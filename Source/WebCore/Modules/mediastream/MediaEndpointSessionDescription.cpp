@@ -31,7 +31,7 @@
 #include "config.h"
 #include "MediaEndpointSessionDescription.h"
 
-#if ENABLE(WEB_RTC)
+#if ENABLE(WEB_RTC) && !USE(QT5WEBRTC)
 
 #include "ExceptionCode.h"
 #include "SDPProcessor.h"

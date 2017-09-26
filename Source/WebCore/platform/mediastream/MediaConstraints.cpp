@@ -217,6 +217,98 @@ void MediaTrackConstraintSetMap::filter(std::function<bool(const MediaConstraint
         return;
     if (m_groupId && !m_groupId->isEmpty() && callback(*m_groupId))
         return;
+
+    // Legacy Constraints - for compatibility
+    if (m_minAspectRatio && !m_minAspectRatio->isEmpty() && callback(*m_minAspectRatio))
+        return;
+    if (m_maxAspectRatio && !m_maxAspectRatio->isEmpty() && callback(*m_maxAspectRatio))
+        return;
+    if (m_maxWidth && !m_maxWidth->isEmpty() && callback(*m_maxWidth))
+        return;
+    if (m_minWidth && !m_minWidth->isEmpty() && callback(*m_minWidth))
+        return;
+    if (m_maxHeight && !m_maxHeight->isEmpty() && callback(*m_maxHeight))
+        return;
+    if (m_minHeight && !m_minHeight->isEmpty() && callback(*m_minHeight))
+        return;
+    if (m_maxFrameRate && !m_maxFrameRate->isEmpty() && callback(*m_maxFrameRate))
+        return;
+    if (m_minFrameRate && !m_minFrameRate->isEmpty() && callback(*m_minFrameRate))
+        return;
+    if (m_googEchoCancellation && !m_googEchoCancellation->isEmpty() && callback(*m_googEchoCancellation))
+        return;
+    if (m_googEchoCancellation2 && !m_googEchoCancellation2->isEmpty() && callback(*m_googEchoCancellation2))
+        return;
+    if (m_googDAEchoCancellation && !m_googDAEchoCancellation->isEmpty() && callback(*m_googDAEchoCancellation))
+        return;
+    if (m_googAutoGainControl && !m_googAutoGainControl->isEmpty() && callback(*m_googAutoGainControl))
+        return;
+    if (m_googAutoGainControl2 && !m_googAutoGainControl2->isEmpty() && callback(*m_googAutoGainControl2))
+        return;
+    if (m_googNoiseSuppression && !m_googNoiseSuppression->isEmpty() && callback(*m_googNoiseSuppression))
+        return;
+    if (m_googNoiseSuppression2 && !m_googNoiseSuppression2->isEmpty() && callback(*m_googNoiseSuppression2))
+        return;
+    if (m_googHighpassFilter && !m_googHighpassFilter->isEmpty() && callback(*m_googHighpassFilter))
+        return;
+    if (m_googTypingNoiseDetection && !m_googTypingNoiseDetection->isEmpty() && callback(*m_googTypingNoiseDetection))
+        return;
+    if (m_googAudioMirroring && !m_googAudioMirroring->isEmpty() && callback(*m_googAudioMirroring))
+        return;
+    if (m_audioDebugRecording && !m_audioDebugRecording->isEmpty() && callback(*m_audioDebugRecording))
+        return;
+    if (m_googNoiseReduction && !m_googNoiseReduction->isEmpty() && callback(*m_googNoiseReduction))
+        return;
+    if (m_offerToReceiveAudio && !m_offerToReceiveAudio->isEmpty() && callback(*m_offerToReceiveAudio))
+        return;
+    if (m_offerToReceiveVideo && !m_offerToReceiveVideo->isEmpty() && callback(*m_offerToReceiveVideo))
+        return;
+    if (m_voiceActivityDetection && !m_voiceActivityDetection->isEmpty() && callback(*m_voiceActivityDetection))
+        return;
+    if (m_iceRestart && !m_iceRestart->isEmpty() && callback(*m_iceRestart))
+        return;
+    if (m_googUseRtpMUX && !m_googUseRtpMUX->isEmpty() && callback(*m_googUseRtpMUX))
+        return;
+    if (m_dtlsSrtpKeyAgreement && !m_dtlsSrtpKeyAgreement->isEmpty() && callback(*m_dtlsSrtpKeyAgreement))
+        return;
+    if (m_rtpDataChannels && !m_rtpDataChannels->isEmpty() && callback(*m_rtpDataChannels))
+        return;
+    if (m_preferh264 && !m_preferh264->isEmpty() && callback(*m_preferh264))
+        return;
+    if (m_ignoreInactiveInterfaces && !m_ignoreInactiveInterfaces->isEmpty() && callback(*m_ignoreInactiveInterfaces))
+        return;
+    if (m_googDscp && !m_googDscp->isEmpty() && callback(*m_googDscp))
+        return;
+    if (m_googIPv6 && !m_googIPv6->isEmpty() && callback(*m_googIPv6))
+        return;
+    if (m_googSuspendBelowMinBitrate && !m_googSuspendBelowMinBitrate->isEmpty() && callback(*m_googSuspendBelowMinBitrate))
+        return;
+    if (m_googNumUnsignalledRecvStreams && !m_googNumUnsignalledRecvStreams->isEmpty() && callback(*m_googNumUnsignalledRecvStreams))
+        return;
+    if (m_googCombinedAudioVideoBwe && !m_googCombinedAudioVideoBwe->isEmpty() && callback(*m_googCombinedAudioVideoBwe))
+        return;
+    if (m_googScreencastMinBitrate && !m_googScreencastMinBitrate->isEmpty() && callback(*m_googScreencastMinBitrate))
+        return;
+    if (m_googCpuOveruseDetection && !m_googCpuOveruseDetection->isEmpty() && callback(*m_googCpuOveruseDetection))
+        return;
+    if (m_googCpuUnderuseThreshold && !m_googCpuUnderuseThreshold->isEmpty() && callback(*m_googCpuUnderuseThreshold))
+        return;
+    if (m_googCpuOveruseThreshold && !m_googCpuOveruseThreshold->isEmpty() && callback(*m_googCpuOveruseThreshold))
+        return;
+    if (m_googCpuUnderuseEncodeRsdThreshold && !m_googCpuUnderuseEncodeRsdThreshold->isEmpty() && callback(*m_googCpuUnderuseEncodeRsdThreshold))
+        return;
+    if (m_googCpuOveruseEncodeRsdThreshold && !m_googCpuOveruseEncodeRsdThreshold->isEmpty() && callback(*m_googCpuOveruseEncodeRsdThreshold))
+        return;
+    if (m_googCpuOveruseEncodeUsage && !m_googCpuOveruseEncodeUsage->isEmpty() && callback(*m_googCpuOveruseEncodeUsage))
+        return;
+    if (m_googHighStartBitrate && !m_googHighStartBitrate->isEmpty() && callback(*m_googHighStartBitrate))
+        return;
+    if (m_googHighBitrate && !m_googHighBitrate->isEmpty() && callback(*m_googHighBitrate))
+        return;
+    if (m_googVeryHighBitrate && !m_googVeryHighBitrate->isEmpty() && callback(*m_googVeryHighBitrate))
+        return;
+    if (m_googPayloadPadding && !m_googPayloadPadding->isEmpty() && callback(*m_googPayloadPadding))
+        return;
 }
 
 void MediaTrackConstraintSetMap::set(MediaConstraintType constraintType, Optional<IntConstraint>&& constraint)
@@ -309,6 +401,143 @@ void MediaTrackConstraintSetMap::set(MediaConstraintType constraintType, Optiona
         break;
     case MediaConstraintType::GroupId:
         m_groupId = WTFMove(constraint);
+        break;
+
+    // Legacy Constraints - for compatibility
+    case MediaConstraintType::MinAspectRatio:
+        m_minAspectRatio = WTFMove(constraint);
+        break;
+    case MediaConstraintType::MaxAspectRatio:
+        m_maxAspectRatio = WTFMove(constraint);
+        break;
+    case MediaConstraintType::MaxWidth:
+        m_maxWidth = WTFMove(constraint);
+        break;
+    case MediaConstraintType::MinWidth:
+        m_minWidth = WTFMove(constraint);
+        break;
+    case MediaConstraintType::MaxHeight:
+        m_maxHeight = WTFMove(constraint);
+        break;
+    case MediaConstraintType::MinHeight:
+        m_minHeight = WTFMove(constraint);
+        break;
+    case MediaConstraintType::MaxFrameRate:
+        m_maxFrameRate = WTFMove(constraint);
+        break;
+    case MediaConstraintType::MinFrameRate:
+        m_minFrameRate = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogEchoCancellation:
+        m_googEchoCancellation = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogEchoCancellation2:
+        m_googEchoCancellation2 = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogDAEchoCancellation:
+        m_googDAEchoCancellation = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogAutoGainControl:
+        m_googAutoGainControl = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogAutoGainControl2:
+        m_googAutoGainControl2 = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogNoiseSuppression:
+        m_googNoiseSuppression = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogNoiseSuppression2:
+        m_googNoiseSuppression2 = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogHighpassFilter:
+        m_googHighpassFilter = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogTypingNoiseDetection:
+        m_googTypingNoiseDetection = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogAudioMirroring:
+        m_googAudioMirroring = WTFMove(constraint);
+        break;
+    case MediaConstraintType::AudioDebugRecording:
+        m_audioDebugRecording = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogNoiseReduction:
+        m_googNoiseReduction = WTFMove(constraint);
+        break;
+    case MediaConstraintType::OfferToReceiveAudio:
+        m_offerToReceiveAudio = WTFMove(constraint);
+        break;
+    case MediaConstraintType::OfferToReceiveVideo:
+        m_offerToReceiveVideo = WTFMove(constraint);
+        break;
+    case MediaConstraintType::VoiceActivityDetection:
+        m_voiceActivityDetection = WTFMove(constraint);
+        break;
+    case MediaConstraintType::IceRestart:
+        m_iceRestart = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogUseRtpMUX:
+        m_googUseRtpMUX = WTFMove(constraint);
+        break;
+    case MediaConstraintType::DtlsSrtpKeyAgreement:
+        m_dtlsSrtpKeyAgreement = WTFMove(constraint);
+        break;
+    case MediaConstraintType::RtpDataChannels:
+        m_rtpDataChannels = WTFMove(constraint);
+        break;
+    case MediaConstraintType::Preferh264:
+        m_preferh264 = WTFMove(constraint);
+        break;
+    case MediaConstraintType::IgnoreInactiveInterfaces:
+        m_ignoreInactiveInterfaces = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogDscp:
+        m_googDscp = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogIPv6:
+        m_googIPv6 = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogSuspendBelowMinBitrate:
+        m_googSuspendBelowMinBitrate = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogNumUnsignalledRecvStreams:
+        m_googNumUnsignalledRecvStreams = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogCombinedAudioVideoBwe:
+        m_googCombinedAudioVideoBwe = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogScreencastMinBitrate:
+        m_googScreencastMinBitrate = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogCpuOveruseDetection:
+        m_googCpuOveruseDetection = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogCpuUnderuseThreshold:
+        m_googCpuUnderuseThreshold = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogCpuOveruseThreshold:
+        m_googCpuOveruseThreshold = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogCpuUnderuseEncodeRsdThreshold:
+        m_googCpuUnderuseEncodeRsdThreshold = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogCpuOveruseEncodeRsdThreshold:
+        m_googCpuOveruseEncodeRsdThreshold = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogCpuOveruseEncodeUsage:
+        m_googCpuOveruseEncodeUsage = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogHighStartBitrate:
+        m_googHighStartBitrate = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogHighBitrate:
+        m_googHighBitrate = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogVeryHighBitrate:
+        m_googVeryHighBitrate = WTFMove(constraint);
+        break;
+    case MediaConstraintType::GoogPayloadPadding:
+        m_googPayloadPadding = WTFMove(constraint);
         break;
 
     case MediaConstraintType::Width:

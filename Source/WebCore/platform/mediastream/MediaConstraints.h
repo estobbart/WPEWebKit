@@ -495,7 +495,6 @@ public:
 
     void appendExact(const String& value)
     {
-        m_exact.clear();
         m_exact.append(value);
     }
 
@@ -512,7 +511,7 @@ public:
 
     bool getExact(Vector<String>& exact) const
     {
-        if (!m_exact.isEmpty())
+        if (m_exact.isEmpty())
             return false;
 
         exact = m_exact;
@@ -521,7 +520,7 @@ public:
 
     bool getIdeal(Vector<String>& ideal) const
     {
-        if (!m_ideal.isEmpty())
+        if (m_ideal.isEmpty())
             return false;
 
         ideal = m_ideal;
@@ -603,6 +602,52 @@ public:
     Optional<StringConstraint> deviceId() const { return m_deviceId; }
     Optional<StringConstraint> groupId() const { return m_groupId; }
 
+    Optional<StringConstraint> minAspectRatio() const { return m_minAspectRatio; }
+    Optional<StringConstraint> maxAspectRatio() const { return m_maxAspectRatio; }
+    Optional<StringConstraint> maxWidth() const { return m_maxWidth; }
+    Optional<StringConstraint> minWidth() const { return m_minWidth; }
+    Optional<StringConstraint> maxHeight() const { return m_maxHeight; }
+    Optional<StringConstraint> minHeight() const { return m_minHeight; }
+    Optional<StringConstraint> maxFrameRate() const { return m_maxFrameRate; }
+    Optional<StringConstraint> minFrameRate() const { return m_minFrameRate; }
+    Optional<StringConstraint> googEchoCancellation() const { return m_googEchoCancellation; }
+    Optional<StringConstraint> googEchoCancellation2() const { return m_googEchoCancellation2; }
+    Optional<StringConstraint> googDAEchoCancellation() const { return m_googDAEchoCancellation; }
+    Optional<StringConstraint> googAutoGainControl() const { return m_googAutoGainControl; }
+    Optional<StringConstraint> googAutoGainControl2() const { return m_googAutoGainControl2; }
+    Optional<StringConstraint> googNoiseSuppression() const { return m_googNoiseSuppression; }
+    Optional<StringConstraint> googNoiseSuppression2() const { return m_googNoiseSuppression2; }
+    Optional<StringConstraint> googHighpassFilter() const { return m_googHighpassFilter; }
+    Optional<StringConstraint> googTypingNoiseDetection() const { return m_googTypingNoiseDetection; }
+    Optional<StringConstraint> googAudioMirroring() const { return m_googAudioMirroring; }
+    Optional<StringConstraint> audioDebugRecording() const { return m_audioDebugRecording; }
+    Optional<StringConstraint> googNoiseReduction() const { return m_googNoiseReduction; }
+    Optional<StringConstraint> offerToReceiveAudio() const { return m_offerToReceiveAudio; }
+    Optional<StringConstraint> offerToReceiveVideo() const { return m_offerToReceiveVideo; }
+    Optional<StringConstraint> voiceActivityDetection() const { return m_voiceActivityDetection; }
+    Optional<StringConstraint> iceRestart() const { return m_iceRestart; }
+    Optional<StringConstraint> googUseRtpMUX() const { return m_googUseRtpMUX; }
+    Optional<StringConstraint> dtlsSrtpKeyAgreement() const { return m_dtlsSrtpKeyAgreement; }
+    Optional<StringConstraint> rtpDataChannels() const { return m_rtpDataChannels; }
+    Optional<StringConstraint> preferh264() const { return m_preferh264; }
+    Optional<StringConstraint> ignoreInactiveInterfaces() const { return m_ignoreInactiveInterfaces; }
+    Optional<StringConstraint> googDscp() const { return m_googDscp; }
+    Optional<StringConstraint> googIPv6() const { return m_googIPv6; }
+    Optional<StringConstraint> googSuspendBelowMinBitrate() const { return m_googSuspendBelowMinBitrate; }
+    Optional<StringConstraint> googNumUnsignalledRecvStreams() const { return m_googNumUnsignalledRecvStreams; }
+    Optional<StringConstraint> googCombinedAudioVideoBwe() const { return m_googCombinedAudioVideoBwe; }
+    Optional<StringConstraint> googScreencastMinBitrate() const { return m_googScreencastMinBitrate; }
+    Optional<StringConstraint> googCpuOveruseDetection() const { return m_googCpuOveruseDetection; }
+    Optional<StringConstraint> googCpuUnderuseThreshold() const { return m_googCpuUnderuseThreshold; }
+    Optional<StringConstraint> googCpuOveruseThreshold() const { return m_googCpuOveruseThreshold; }
+    Optional<StringConstraint> googCpuUnderuseEncodeRsdThreshold() const { return m_googCpuUnderuseEncodeRsdThreshold; }
+    Optional<StringConstraint> googCpuOveruseEncodeRsdThreshold() const { return m_googCpuOveruseEncodeRsdThreshold; }
+    Optional<StringConstraint> googCpuOveruseEncodeUsage() const { return m_googCpuOveruseEncodeUsage; }
+    Optional<StringConstraint> googHighStartBitrate() const { return m_googHighStartBitrate; }
+    Optional<StringConstraint> googHighBitrate() const { return m_googHighBitrate; }
+    Optional<StringConstraint> googVeryHighBitrate() const { return m_googVeryHighBitrate; }
+    Optional<StringConstraint> googPayloadPadding() const { return m_googPayloadPadding; }
+
     template <class Encoder> void encode(Encoder& encoder) const
     {
         encoder << m_width;
@@ -619,6 +664,52 @@ public:
         encoder << m_facingMode;
         encoder << m_deviceId;
         encoder << m_groupId;
+
+        encoder << m_minAspectRatio;
+        encoder << m_maxAspectRatio;
+        encoder << m_maxWidth;
+        encoder << m_minWidth;
+        encoder << m_maxHeight;
+        encoder << m_minHeight;
+        encoder << m_maxFrameRate;
+        encoder << m_minFrameRate;
+        encoder << m_googEchoCancellation;
+        encoder << m_googEchoCancellation2;
+        encoder << m_googDAEchoCancellation;
+        encoder << m_googAutoGainControl;
+        encoder << m_googAutoGainControl2;
+        encoder << m_googNoiseSuppression;
+        encoder << m_googNoiseSuppression2;
+        encoder << m_googHighpassFilter;
+        encoder << m_googTypingNoiseDetection;
+        encoder << m_googAudioMirroring;
+        encoder << m_audioDebugRecording;
+        encoder << m_googNoiseReduction;
+        encoder << m_offerToReceiveAudio;
+        encoder << m_offerToReceiveVideo;
+        encoder << m_voiceActivityDetection;
+        encoder << m_iceRestart;
+        encoder << m_googUseRtpMUX;
+        encoder << m_dtlsSrtpKeyAgreement;
+        encoder << m_rtpDataChannels;
+        encoder << m_preferh264;
+        encoder << m_ignoreInactiveInterfaces;
+        encoder << m_googDscp;
+        encoder << m_googIPv6;
+        encoder << m_googSuspendBelowMinBitrate;
+        encoder << m_googNumUnsignalledRecvStreams;
+        encoder << m_googCombinedAudioVideoBwe;
+        encoder << m_googScreencastMinBitrate;
+        encoder << m_googCpuOveruseDetection;
+        encoder << m_googCpuUnderuseThreshold;
+        encoder << m_googCpuOveruseThreshold;
+        encoder << m_googCpuUnderuseEncodeRsdThreshold;
+        encoder << m_googCpuOveruseEncodeRsdThreshold;
+        encoder << m_googCpuOveruseEncodeUsage;
+        encoder << m_googHighStartBitrate;
+        encoder << m_googHighBitrate;
+        encoder << m_googVeryHighBitrate;
+        encoder << m_googPayloadPadding;
     }
 
     template <class Decoder> static bool decode(Decoder& decoder, MediaTrackConstraintSetMap& map)
@@ -649,6 +740,97 @@ public:
         if (!decoder.decode(map.m_groupId))
             return false;
 
+        if (!decoder.decode(map.m_minAspectRatio))
+            return false;
+        if (!decoder.decode(map.m_maxAspectRatio))
+            return false;
+        if (!decoder.decode(map.m_maxWidth))
+            return false;
+        if (!decoder.decode(map.m_minWidth))
+            return false;
+        if (!decoder.decode(map.m_maxHeight))
+            return false;
+        if (!decoder.decode(map.m_minHeight))
+            return false;
+        if (!decoder.decode(map.m_maxFrameRate))
+            return false;
+        if (!decoder.decode(map.m_minFrameRate))
+            return false;
+        if (!decoder.decode(map.m_googEchoCancellation))
+            return false;
+        if (!decoder.decode(map.m_googEchoCancellation2))
+            return false;
+        if (!decoder.decode(map.m_googDAEchoCancellation))
+            return false;
+        if (!decoder.decode(map.m_googAutoGainControl))
+            return false;
+        if (!decoder.decode(map.m_googAutoGainControl2))
+            return false;
+        if (!decoder.decode(map.m_googNoiseSuppression))
+            return false;
+        if (!decoder.decode(map.m_googNoiseSuppression2))
+            return false;
+        if (!decoder.decode(map.m_googHighpassFilter))
+            return false;
+        if (!decoder.decode(map.m_googTypingNoiseDetection))
+            return false;
+        if (!decoder.decode(map.m_googAudioMirroring))
+            return false;
+        if (!decoder.decode(map.m_audioDebugRecording))
+            return false;
+        if (!decoder.decode(map.m_googNoiseReduction))
+            return false;
+        if (!decoder.decode(map.m_offerToReceiveAudio))
+            return false;
+        if (!decoder.decode(map.m_offerToReceiveVideo))
+            return false;
+        if (!decoder.decode(map.m_voiceActivityDetection))
+            return false;
+        if (!decoder.decode(map.m_iceRestart))
+            return false;
+        if (!decoder.decode(map.m_googUseRtpMUX))
+            return false;
+        if (!decoder.decode(map.m_dtlsSrtpKeyAgreement))
+            return false;
+        if (!decoder.decode(map.m_rtpDataChannels))
+            return false;
+        if (!decoder.decode(map.m_preferh264))
+            return false;
+        if (!decoder.decode(map.m_ignoreInactiveInterfaces))
+            return false;
+        if (!decoder.decode(map.m_googDscp))
+            return false;
+        if (!decoder.decode(map.m_googIPv6))
+            return false;
+        if (!decoder.decode(map.m_googSuspendBelowMinBitrate))
+            return false;
+        if (!decoder.decode(map.m_googNumUnsignalledRecvStreams))
+            return false;
+        if (!decoder.decode(map.m_googCombinedAudioVideoBwe))
+            return false;
+        if (!decoder.decode(map.m_googScreencastMinBitrate))
+            return false;
+        if (!decoder.decode(map.m_googCpuOveruseDetection))
+            return false;
+        if (!decoder.decode(map.m_googCpuUnderuseThreshold))
+            return false;
+        if (!decoder.decode(map.m_googCpuOveruseThreshold))
+            return false;
+        if (!decoder.decode(map.m_googCpuUnderuseEncodeRsdThreshold))
+            return false;
+        if (!decoder.decode(map.m_googCpuOveruseEncodeRsdThreshold))
+            return false;
+        if (!decoder.decode(map.m_googCpuOveruseEncodeUsage))
+            return false;
+        if (!decoder.decode(map.m_googHighStartBitrate))
+            return false;
+        if (!decoder.decode(map.m_googHighBitrate))
+            return false;
+        if (!decoder.decode(map.m_googVeryHighBitrate))
+            return false;
+        if (!decoder.decode(map.m_googPayloadPadding))
+            return false;
+
         return true;
     }
 
@@ -667,6 +849,52 @@ private:
     Optional<StringConstraint> m_facingMode;
     Optional<StringConstraint> m_deviceId;
     Optional<StringConstraint> m_groupId;
+
+    Optional<StringConstraint> m_minAspectRatio;
+    Optional<StringConstraint> m_maxAspectRatio;
+    Optional<StringConstraint> m_maxWidth;
+    Optional<StringConstraint> m_minWidth;
+    Optional<StringConstraint> m_maxHeight;
+    Optional<StringConstraint> m_minHeight;
+    Optional<StringConstraint> m_maxFrameRate;
+    Optional<StringConstraint> m_minFrameRate;
+    Optional<StringConstraint> m_googEchoCancellation;
+    Optional<StringConstraint> m_googEchoCancellation2;
+    Optional<StringConstraint> m_googDAEchoCancellation;
+    Optional<StringConstraint> m_googAutoGainControl;
+    Optional<StringConstraint> m_googAutoGainControl2;
+    Optional<StringConstraint> m_googNoiseSuppression;
+    Optional<StringConstraint> m_googNoiseSuppression2;
+    Optional<StringConstraint> m_googHighpassFilter;
+    Optional<StringConstraint> m_googTypingNoiseDetection;
+    Optional<StringConstraint> m_googAudioMirroring;
+    Optional<StringConstraint> m_audioDebugRecording;
+    Optional<StringConstraint> m_googNoiseReduction;
+    Optional<StringConstraint> m_offerToReceiveAudio;
+    Optional<StringConstraint> m_offerToReceiveVideo;
+    Optional<StringConstraint> m_voiceActivityDetection;
+    Optional<StringConstraint> m_iceRestart;
+    Optional<StringConstraint> m_googUseRtpMUX;
+    Optional<StringConstraint> m_dtlsSrtpKeyAgreement;
+    Optional<StringConstraint> m_rtpDataChannels;
+    Optional<StringConstraint> m_preferh264;
+    Optional<StringConstraint> m_ignoreInactiveInterfaces;
+    Optional<StringConstraint> m_googDscp;
+    Optional<StringConstraint> m_googIPv6;
+    Optional<StringConstraint> m_googSuspendBelowMinBitrate;
+    Optional<StringConstraint> m_googNumUnsignalledRecvStreams;
+    Optional<StringConstraint> m_googCombinedAudioVideoBwe;
+    Optional<StringConstraint> m_googScreencastMinBitrate;
+    Optional<StringConstraint> m_googCpuOveruseDetection;
+    Optional<StringConstraint> m_googCpuUnderuseThreshold;
+    Optional<StringConstraint> m_googCpuOveruseThreshold;
+    Optional<StringConstraint> m_googCpuUnderuseEncodeRsdThreshold;
+    Optional<StringConstraint> m_googCpuOveruseEncodeRsdThreshold;
+    Optional<StringConstraint> m_googCpuOveruseEncodeUsage;
+    Optional<StringConstraint> m_googHighStartBitrate;
+    Optional<StringConstraint> m_googHighBitrate;
+    Optional<StringConstraint> m_googVeryHighBitrate;
+    Optional<StringConstraint> m_googPayloadPadding;
 };
 
 class FlattenedConstraint {

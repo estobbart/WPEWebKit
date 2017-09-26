@@ -160,6 +160,26 @@ ExceptionOr<String> XMLHttpRequest::responseText()
 {
     if (m_responseType != ResponseType::EmptyString && m_responseType != ResponseType::Text)
         return Exception { INVALID_STATE_ERR };
+
+    static bool disableStoryboard = !!getenv("WPE_DISABLE_YOUTUBE_STORYBOARD");
+    if (disableStoryboard && url().host().contains("youtube.com") && url().lastPathComponent() == "get_video_info")
+    {
+        if (m_textResponceCache.isEmpty())
+        {
+            m_textResponceCache = responseTextIgnoringResponseType();
+            size_t storyBoardSpecPos = m_textResponceCache.find("storyboard_spec");
+            if (storyBoardSpecPos != WTF::notFound)
+            {
+                size_t specEnd = m_textResponceCache.find('&', storyBoardSpecPos);
+                if (specEnd != WTF::notFound)
+                {
+                    m_textResponceCache.remove(storyBoardSpecPos, specEnd - storyBoardSpecPos);
+                }
+            }
+        }
+        String resp = m_textResponceCache;
+        return WTFMove(resp);
+    }
     return responseTextIgnoringResponseType();
 }
 

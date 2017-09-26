@@ -1100,7 +1100,11 @@ JSObject* ScriptExecutable::prepareForExecution(VM& vm, JSFunction* function, JS
     return prepareForExecutionImpl(vm, function, scope, kind, resultCodeBlock);
 }
 
+#if 0
 #define CODEBLOCK_LOG_EVENT(codeBlock, summary, details) \
     (codeBlock->vm()->logEvent(codeBlock, summary, [&] () { return toCString details; }))
+#else
+#define CODEBLOCK_LOG_EVENT(codeBlock, summary, details)
+#endif
 
 } // namespace JSC

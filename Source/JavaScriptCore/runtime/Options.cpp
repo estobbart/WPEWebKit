@@ -408,6 +408,9 @@ static void recomputeDependentOptions()
     else
         fastSetMaxSingleAllocationSize(std::numeric_limits<size_t>::max());
 #endif
+
+    if (!getenv("RFC_ENABLE_WEBKIT_INSPECTOR"))
+        Options::disableStackTrace() = true;
 }
 
 void Options::initialize()

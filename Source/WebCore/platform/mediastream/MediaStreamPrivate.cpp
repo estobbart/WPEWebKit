@@ -47,6 +47,11 @@ namespace WebCore {
 
 Ref<MediaStreamPrivate> MediaStreamPrivate::create(const Vector<Ref<RealtimeMediaSource>>& audioSources, const Vector<Ref<RealtimeMediaSource>>& videoSources)
 {
+    return MediaStreamPrivate::create(createCanonicalUUIDString(), audioSources, videoSources);
+}
+
+Ref<MediaStreamPrivate> MediaStreamPrivate::create(const String& id, const Vector<Ref<RealtimeMediaSource>>& audioSources, const Vector<Ref<RealtimeMediaSource>>& videoSources)
+{
     MediaStreamTrackPrivateVector tracks;
     tracks.reserveInitialCapacity(audioSources.size() + videoSources.size());
 
@@ -56,7 +61,7 @@ Ref<MediaStreamPrivate> MediaStreamPrivate::create(const Vector<Ref<RealtimeMedi
     for (auto& source : videoSources)
         tracks.uncheckedAppend(MediaStreamTrackPrivate::create(source.copyRef()));
 
-    return MediaStreamPrivate::create(tracks);
+    return adoptRef(*new MediaStreamPrivate(id, tracks));
 }
 
 Ref<MediaStreamPrivate> MediaStreamPrivate::create(const MediaStreamTrackPrivateVector& tracks)

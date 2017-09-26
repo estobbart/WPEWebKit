@@ -93,6 +93,11 @@
 #if USE(HOLE_PUNCH_EXTERNAL)
 #include "MediaPlayerPrivateHolePunchDummy.h"
 #endif
+
+#if ENABLE(MEDIA_STREAM) && USE(QT5WEBRTC)
+#include "MediaPlayerPrivateQt5WebRTC.h"
+#endif
+
 namespace WebCore {
 
 const PlatformMedia NoPlatformMedia = { PlatformMedia::None, {0} };
@@ -233,8 +238,8 @@ static void buildMediaEnginesVector()
         MediaPlayerPrivateQTKit::registerMediaEngine(addMediaEngine);
 #endif
 
-#if USE(HOLE_PUNCH_EXTERNAL)
-    MediaPlayerPrivateHolePunchDummy::registerMediaEngine(addMediaEngine);
+#if ENABLE(MEDIA_STREAM) && USE(QT5WEBRTC)
+    MediaPlayerPrivateQt5WebRTC::registerMediaEngine(addMediaEngine);
 #endif
 
 #if ENABLE(MEDIA_STREAM) && USE(GSTREAMER) && USE(OPENWEBRTC)
@@ -252,6 +257,10 @@ static void buildMediaEnginesVector()
 #if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
     if (Settings::isGStreamerEnabled())
         MediaPlayerPrivateGStreamerMSE::registerMediaEngine(addMediaEngine);
+#endif
+
+#if USE(HOLE_PUNCH_EXTERNAL)
+    MediaPlayerPrivateHolePunchDummy::registerMediaEngine(addMediaEngine);
 #endif
 
     haveMediaEnginesVector() = true;

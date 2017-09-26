@@ -38,6 +38,14 @@ extern "C" void _ReadWriteBarrier(void);
 #include <intrin.h>
 #endif
 
+#if COMPILER(GCC) && defined __OPTIMIZE_SIZE__
+#if !GCC_VERSION_AT_LEAST(5,0,0)
+/* Gcc < 5 has issues with std::atomic in -Os. Resorting to a workaround that
+ * will make things slow on some platforms. */
+#define ATOMICS_ALWAYS_USE_SEQ_CST 1
+#endif
+#endif
+
 namespace WTF {
 
 // Atomic wraps around std::atomic with the sole purpose of making the compare_exchange
@@ -61,6 +69,9 @@ struct Atomic {
 
     ALWAYS_INLINE bool compareExchangeWeak(T expected, T desired, std::memory_order order = std::memory_order_seq_cst)
     {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
         T expectedOrActual = expected;
         return value.compare_exchange_weak(expectedOrActual, desired, order);
     }
@@ -72,12 +83,19 @@ struct Atomic {
 
     ALWAYS_INLINE bool compareExchangeWeak(T expected, T desired, std::memory_order order_success, std::memory_order order_failure)
     {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order_success = std::memory_order_seq_cst;
+        order_failure = std::memory_order_seq_cst;
+#endif
         T expectedOrActual = expected;
         return value.compare_exchange_weak(expectedOrActual, desired, order_success, order_failure);
     }
 
     ALWAYS_INLINE T compareExchangeStrong(T expected, T desired, std::memory_order order = std::memory_order_seq_cst)
     {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
         T expectedOrActual = expected;
         value.compare_exchange_strong(expectedOrActual, desired, order);
         return expectedOrActual;
@@ -85,27 +103,67 @@ struct Atomic {
 
     ALWAYS_INLINE T compareExchangeStrong(T expected, T desired, std::memory_order order_success, std::memory_order order_failure)
     {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order_success = std::memory_order_seq_cst;
+        order_failure = std::memory_order_seq_cst;
+#endif
         T expectedOrActual = expected;
         value.compare_exchange_strong(expectedOrActual, desired, order_success, order_failure);
         return expectedOrActual;
     }
 
     template<typename U>
-    ALWAYS_INLINE T exchangeAdd(U operand, std::memory_order order = std::memory_order_seq_cst) { return value.fetch_add(operand, order); }
+    ALWAYS_INLINE T exchangeAdd(U operand, std::memory_order order = std::memory_order_seq_cst)
+    {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
+        return value.fetch_add(operand, order);
+    }
     
     template<typename U>
-    ALWAYS_INLINE T exchangeAnd(U operand, std::memory_order order = std::memory_order_seq_cst) { return value.fetch_and(operand, order); }
+    ALWAYS_INLINE T exchangeAnd(U operand, std::memory_order order = std::memory_order_seq_cst)
+    {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
+        return value.fetch_and(operand, order);
+    }
     
     template<typename U>
-    ALWAYS_INLINE T exchangeOr(U operand, std::memory_order order = std::memory_order_seq_cst) { return value.fetch_or(operand, order); }
+    ALWAYS_INLINE T exchangeOr(U operand, std::memory_order order = std::memory_order_seq_cst)
+    {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
+        return value.fetch_or(operand, order);
+    }
     
     template<typename U>
-    ALWAYS_INLINE T exchangeSub(U operand, std::memory_order order = std::memory_order_seq_cst) { return value.fetch_sub(operand, order); }
+    ALWAYS_INLINE T exchangeSub(U operand, std::memory_order order = std::memory_order_seq_cst)
+    {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
+        return value.fetch_sub(operand, order);
+    }
     
     template<typename U>
-    ALWAYS_INLINE T exchangeXor(U operand, std::memory_order order = std::memory_order_seq_cst) { return value.fetch_xor(operand, order); }
+    ALWAYS_INLINE T exchangeXor(U operand, std::memory_order order = std::memory_order_seq_cst)
+    {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
+        return value.fetch_xor(operand, order);
+    }
     
-    ALWAYS_INLINE T exchange(T newValue, std::memory_order order = std::memory_order_seq_cst) { return value.exchange(newValue, order); }
+    ALWAYS_INLINE T exchange(T newValue, std::memory_order order = std::memory_order_seq_cst)
+    {
+#if defined(ATOMICS_ALWAYS_USE_SEQ_CST)
+        order = std::memory_order_seq_cst;
+#endif
+        return value.exchange(newValue, order);
+    }
 
     std::atomic<T> value;
 };

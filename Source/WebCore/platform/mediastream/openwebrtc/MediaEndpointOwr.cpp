@@ -30,7 +30,8 @@
 
 #include "config.h"
 
-#if ENABLE(WEB_RTC)
+#if ENABLE(WEB_RTC) && !USE(QT5WEBRTC)
+
 #include "MediaEndpointOwr.h"
 
 #include "MediaEndpointSessionConfiguration.h"

@@ -118,6 +118,8 @@
 #include "StyleProperties.cpp"
 #include "StylePropertyShorthand.cpp"
 #include "StyleResolver.cpp"
+#include "StyleTreeResolver.cpp"
+#include "StyleSharingResolver.cpp"
 #include "StyleRule.cpp"
 #include "StyleRuleImport.cpp"
 #include "StyleSheet.cpp"

@@ -153,7 +153,7 @@ static const GstStreamVolumeFormat VOLUME_FORMAT = GST_STREAM_VOLUME_FORMAT_CUBI
 
 void registerWebKitGStreamerElements()
 {
-    if (!webkitGstCheckVersion(1, 6, 1))
+    if (!webkitGstCheckVersion(1, 4, 4))
         return;
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA)
@@ -693,13 +693,6 @@ FloatSize MediaPlayerPrivateGStreamerBase::naturalSize() const
     GstVideoFormat format;
     if (!getVideoSizeAndFormatFromCaps(caps.get(), originalSize, format, pixelAspectRatioNumerator, pixelAspectRatioDenominator, stride))
         return FloatSize();
-
-    // Sanity check for the unlikely, but reproducible case when getVideoSizeAndFormatFromCaps returns incorrect values
-    if ((originalSize.width() == 0) || (originalSize.height() == 0)
-       || (pixelAspectRatioNumerator == 0) || (pixelAspectRatioNumerator == 0)) {
-        GST_DEBUG("getVideoSizeAndFormatFromCaps returned an invalid info, returning an empty size");
-        return FloatSize();
-    }
 
 #if USE(TEXTURE_MAPPER_GL)
     // When using accelerated compositing, if the video is tagged as rotated 90 or 270 degrees, swap width and height.
@@ -1596,7 +1589,7 @@ void MediaPlayerPrivateGStreamerBase::emitOpenCDMSession()
 
     bool eventHandled = gst_element_send_event(m_pipeline.get(), gst_event_new_custom(GST_EVENT_CUSTOM_DOWNSTREAM_OOB,
         gst_structure_new("drm-session", "session", G_TYPE_STRING, sessionId.utf8().data(), nullptr)));
-    GST_TRACE("emitted OpenCDM session on pipeline, event handled %s", eventHandled ? "yes" : "no");
+    GST_DEBUG("emitted OpenCDM session on pipeline, event handled %s", eventHandled ? "yes" : "no");
 }
 
 void MediaPlayerPrivateGStreamerBase::resetOpenCDMSession()
@@ -1628,6 +1621,7 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::addKey(const Str
 
         if (errorCode || !result) {
             GST_ERROR("Error processing key: errorCode: %u, result: %d", errorCode, result);
+            m_player->keyError(keySystem, sessionID, errorCode, systemCode);
             return MediaPlayer::InvalidPlayerState;
         }
 
@@ -1732,8 +1726,10 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::generateKeyReque
         initDataVector.append(reinterpret_cast<const uint8_t*>(initDataPtr), initDataLength);
         LockHolder prSessionsLocker(m_prSessionsMutex);
         PlayreadySession* prSession = prSessionByInitData(initDataVector, true);
-        if (!prSession)
+        if (!prSession){
             GST_ERROR("prSession should already have been created when handling the protection events");
+            prSession = createPlayreadySession(initDataVector, nullptr, true);
+        }
         prSessionsLocker.unlockEarly();
 
         LockHolder locker(prSession->mutex());
@@ -1746,6 +1742,7 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::generateKeyReque
             return MediaPlayer::NoError;
         }
 
+#ifdef DROP_PSSH
         // there can be only 1 pssh, so skip this one (fixed lemgth)
         // Data: <4 bytes total length><4 bytes FCC><4 bytes length ex this><Given Bytes in last length field><16 bytes GUID><4 bytes length ex this><Given Bytes in last length field>
         // https://www.w3.org/TR/2014/WD-encrypted-media-20140828/cenc-format.html
@@ -1758,9 +1755,16 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::generateKeyReque
         GST_TRACE("current init data size %u, substracted %u", initDataLength, boxLength);
         GST_MEMDUMP ("init data", &(initDataPtr[boxLength]), (initDataLength - boxLength));
 
+        RefPtr<Uint8Array> initData = Uint8Array::create(&(initDataPtr[boxLength]), initDataLength-boxLength);
+#else
+        GST_TRACE("current init data size %u", initDataLength);
+        GST_MEMDUMP ("init data", initDataPtr, initDataLength);
+
+        RefPtr<Uint8Array> initData = Uint8Array::create(initDataPtr, initDataLength);
+#endif
+
         unsigned short errorCode;
         uint32_t systemCode;
-        RefPtr<Uint8Array> initData = Uint8Array::create(&(initDataPtr[boxLength]), initDataLength-boxLength);
         String destinationURL;
         RefPtr<Uint8Array> result = prSession->playreadyGenerateKeyRequest(initData.get(), customData, destinationURL, errorCode, systemCode);
         if (errorCode) {
@@ -1804,6 +1808,7 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateGStreamerBase::generateKeyReque
         RefPtr<Uint8Array> result = m_cdmSession->generateKeyRequest(mimeType, initData.get(), destinationURL, errorCode, systemCode);
         if (errorCode) {
             GST_ERROR("the key request wasn't properly generated");
+            m_player->keyError(keySystem, m_cdmSession->sessionId(), errorCode, systemCode);
             return MediaPlayer::InvalidPlayerState;
         }
 

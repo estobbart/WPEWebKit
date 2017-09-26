@@ -2106,11 +2106,14 @@ EncodedJSValue JIT_OPERATION operationGetFromScope(ExecState* exec, Instruction*
     // ModuleVar is always converted to ClosureVar for get_from_scope.
     ASSERT(getPutInfo.resolveType() != ModuleVar);
 
-    return JSValue::encode(scope->getPropertySlot(exec, ident, [&] (bool found, PropertySlot& slot) -> JSValue {
+    PropertySlot slot(scope, PropertySlot::InternalMethodType::Get);
+    auto found = scope->getPropertySlot(exec, ident, slot);
+    RETURN_IF_EXCEPTION(throwScope, encodedJSValue());
+    {
         if (!found) {
             if (getPutInfo.resolveMode() == ThrowIfNotFound)
                 throwException(exec, throwScope, createUndefinedVariableError(exec, ident));
-            return jsUndefined();
+            return JSValue::encode(jsUndefined());
         }
 
         JSValue result = JSValue();
@@ -2119,16 +2122,16 @@ EncodedJSValue JIT_OPERATION operationGetFromScope(ExecState* exec, Instruction*
             result = slot.getValue(exec, ident);
             if (result == jsTDZValue()) {
                 throwException(exec, throwScope, createTDZError(exec));
-                return jsUndefined();
+                return JSValue::encode(jsUndefined());
             }
         }
 
         CommonSlowPaths::tryCacheGetFromScopeGlobal(exec, vm, pc, scope, slot, ident);
 
         if (!result)
-            return slot.getValue(exec, ident);
-        return result;
-    }));
+            return JSValue::encode(slot.getValue(exec, ident));
+        return JSValue::encode(result);
+    }
 }
 
 void JIT_OPERATION operationPutToScope(ExecState* exec, Instruction* bytecodePC)

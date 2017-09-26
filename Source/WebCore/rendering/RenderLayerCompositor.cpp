@@ -276,6 +276,8 @@ RenderLayerCompositor::RenderLayerCompositor(RenderView& renderView)
     , m_updateCompositingLayersTimer(*this, &RenderLayerCompositor::updateCompositingLayersTimerFired)
     , m_layerFlushTimer(*this, &RenderLayerCompositor::layerFlushTimerFired)
 {
+    Document *doc = renderView.frameView().frame().document();
+    m_enableYoutubeWorkarounds = doc && doc->origin().contains("www.youtube.com");
 }
 
 RenderLayerCompositor::~RenderLayerCompositor()
@@ -2591,6 +2593,9 @@ bool RenderLayerCompositor::requiresCompositingForAnimation(RenderLayerModelObje
 {
     if (!(m_compositingTriggers & ChromeClient::AnimationTrigger))
         return false;
+
+    if (m_enableYoutubeWorkarounds && renderer.isCSSAnimating() && renderer.hasTransform())
+        return true;
 
     const AnimationBase::RunningState activeAnimationState = AnimationBase::Running | AnimationBase::Paused;
     AnimationController& animController = renderer.animation();

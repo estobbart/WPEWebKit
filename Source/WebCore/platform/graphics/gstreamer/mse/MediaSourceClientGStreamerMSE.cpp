@@ -33,6 +33,14 @@ GST_DEBUG_CATEGORY_EXTERN(webkit_mse_debug);
 
 namespace WebCore {
 
+static MediaSourceClientGStreamerMSE* gActiveMediaSourceClient = nullptr;
+
+void flushActiveStartupBuffers()
+{
+    if (gActiveMediaSourceClient)
+        gActiveMediaSourceClient->flushStartupBuffers();
+}
+
 Ref<MediaSourceClientGStreamerMSE> MediaSourceClientGStreamerMSE::create(MediaPlayerPrivateGStreamerMSE& playerPrivate)
 {
     ASSERT(WTF::isMainThread());
@@ -53,6 +61,8 @@ MediaSourceClientGStreamerMSE::MediaSourceClientGStreamerMSE(MediaPlayerPrivateG
 MediaSourceClientGStreamerMSE::~MediaSourceClientGStreamerMSE()
 {
     ASSERT(WTF::isMainThread());
+    if (gActiveMediaSourceClient == this)
+        gActiveMediaSourceClient = nullptr;
 }
 
 MediaSourcePrivate::AddStatus MediaSourceClientGStreamerMSE::addSourceBuffer(RefPtr<SourceBufferPrivateGStreamer> sourceBufferPrivate, const ContentType&)
@@ -133,6 +143,9 @@ bool MediaSourceClientGStreamerMSE::append(RefPtr<SourceBufferPrivateGStreamer> 
     if (!m_playerPrivate)
         return false;
 
+    if (!m_startupBufferingComplete)
+        gActiveMediaSourceClient = this;
+
     RefPtr<AppendPipeline> appendPipeline = m_playerPrivate->m_appendPipelinesMap.get(sourceBufferPrivate);
 
     ASSERT(appendPipeline);
@@ -188,8 +201,7 @@ void MediaSourceClientGStreamerMSE::flush(AtomicString trackId)
 {
     ASSERT(WTF::isMainThread());
 
-    // This is only for on-the-fly reenqueues after appends. When seeking, the seek will do its own flush.
-    if (m_playerPrivate && !m_playerPrivate->m_seeking)
+    if (m_playerPrivate)
         m_playerPrivate->m_playbackPipeline->flush(trackId);
 }
 
@@ -220,6 +232,36 @@ void MediaSourceClientGStreamerMSE::clearPlayerPrivate()
     ASSERT(WTF::isMainThread());
 
     m_playerPrivate = nullptr;
+
+    if (gActiveMediaSourceClient == this)
+        gActiveMediaSourceClient = nullptr;
+}
+
+void MediaSourceClientGStreamerMSE::flushStartupBuffers()
+{
+    ASSERT(WTF::isMainThread());
+
+    if (!m_playerPrivate)
+        return;
+
+    for (auto it : m_playerPrivate->m_appendPipelinesMap)
+        it.value->flushStartupSamples();
+}
+
+void MediaSourceClientGStreamerMSE::setStartupBufferingComplete(bool complete)
+{
+    ASSERT(WTF::isMainThread());
+
+    if (!m_playerPrivate)
+        return;
+
+    for (auto it : m_playerPrivate->m_appendPipelinesMap)
+        it.value->setStartupBufferingComplete(complete);
+
+    if (complete && gActiveMediaSourceClient == this)
+        gActiveMediaSourceClient = nullptr;
+
+    m_startupBufferingComplete = complete;
 }
 
 } // namespace WebCore.

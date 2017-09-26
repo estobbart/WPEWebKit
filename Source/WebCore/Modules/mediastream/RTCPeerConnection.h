@@ -65,14 +65,14 @@ public:
     using OfferAnswerOptions = RTCOfferAnswerOptions;
     using OfferOptions = RTCOfferOptions;
 
-    ExceptionOr<void> initializeWith(Document&, const Dictionary&);
+    ExceptionOr<void> initializeWith(Document&, const Dictionary&, const Dictionary&);
 
     const Vector<std::reference_wrapper<RTCRtpSender>>& getSenders() const { return m_transceiverSet->senders(); }
     const Vector<std::reference_wrapper<RTCRtpReceiver>>& getReceivers() const { return m_transceiverSet->receivers(); }
     const Vector<RefPtr<RTCRtpTransceiver>>& getTransceivers() const { return m_transceiverSet->list(); }
 
     // Part of legacy MediaStream-based API (mostly implemented as JS built-ins)
-    Vector<RefPtr<MediaStream>> getRemoteStreams() const { return m_backend->getRemoteStreams(); }
+    //Vector<RefPtr<MediaStream>> getRemoteStreams() const { return m_backend->getRemoteStreams(); }
 
     ExceptionOr<Ref<RTCRtpSender>> addTrack(Ref<MediaStreamTrack>&&, const Vector<std::reference_wrapper<MediaStream>>&);
     ExceptionOr<void> removeTrack(RTCRtpSender&);
@@ -140,6 +140,10 @@ public:
     PeerConnectionStates::IceGatheringState internalIceGatheringState() const { return m_iceGatheringState; }
     PeerConnectionStates::IceConnectionState internalIceConnectionState() const { return m_iceConnectionState; }
 
+    // Deprecated or removed from spec
+    ExceptionOr<void> addStream(Ref<MediaStream>&&);
+    Vector<RefPtr<MediaStream>> getRemoteStreams() const;
+    Vector<RefPtr<MediaStream>> getLocalStreams() const {return m_localStreams; }
 private:
     RTCPeerConnection(ScriptExecutionContext&);
 
@@ -168,6 +172,10 @@ private:
     std::unique_ptr<PeerConnectionBackend> m_backend;
 
     RefPtr<RTCConfiguration> m_configuration;
+    RefPtr<MediaConstraints> m_constraints;
+
+    // Deprecated or removed from spec
+    Vector<RefPtr<MediaStream>> m_localStreams;
 };
 
 } // namespace WebCore

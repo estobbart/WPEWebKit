@@ -69,6 +69,7 @@ private:
     };
 
     void updateTimerFired();
+    void startUpdateTimer();
 
     RunLoop::Timer<CompositingRunLoop> m_updateTimer;
 #ifndef NDEBUG
@@ -78,6 +79,7 @@ private:
     Atomic<UpdateState> m_updateState;
     Lock m_dispatchSyncConditionMutex;
     Condition m_dispatchSyncCondition;
+    double m_updateTime { 0 };
 };
 
 } // namespace WebKit

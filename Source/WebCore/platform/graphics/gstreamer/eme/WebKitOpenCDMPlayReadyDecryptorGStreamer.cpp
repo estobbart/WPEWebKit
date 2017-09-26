@@ -36,12 +36,13 @@ static GstStaticPadTemplate sinkTemplate = GST_STATIC_PAD_TEMPLATE("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS("application/x-cenc, original-media-type=(string)video/x-h264, protection-system=(string)" PLAYREADY_PROTECTION_SYSTEM_UUID "; "
+    "application/x-cenc, original-media-type=(string)video/x-h265, protection-system=(string)" PLAYREADY_PROTECTION_SYSTEM_UUID "; "
     "application/x-cenc, original-media-type=(string)audio/mpeg, protection-system=(string)" PLAYREADY_PROTECTION_SYSTEM_UUID ";"));
 
 static GstStaticPadTemplate srcTemplate = GST_STATIC_PAD_TEMPLATE("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS("audio/mpeg; video/x-h264"));
+    GST_STATIC_CAPS("audio/mpeg; video/x-h264; video/x-h265"));
 
 #define webkit_media_opencdm_playready_decrypt_parent_class parent_class
 G_DEFINE_TYPE(WebKitOpenCDMPlayReadyDecrypt, webkit_media_opencdm_playready_decrypt, WEBKIT_TYPE_OPENCDM_DECRYPT);

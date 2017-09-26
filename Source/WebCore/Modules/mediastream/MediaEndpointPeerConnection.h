@@ -30,7 +30,7 @@
 
 #pragma once
 
-#if ENABLE(WEB_RTC)
+#if ENABLE(WEB_RTC) && !USE(QT5WEBRTC)
 
 #include "MediaEndpoint.h"
 #include "MediaEndpointSessionDescription.h"
@@ -62,11 +62,11 @@ public:
     RefPtr<RTCSessionDescription> currentRemoteDescription() const override;
     RefPtr<RTCSessionDescription> pendingRemoteDescription() const override;
 
-    void setConfiguration(RTCConfiguration&) override;
+    void setConfiguration(RTCConfiguration&, const MediaConstraints&) override;
 
     void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) override;
 
-    Vector<RefPtr<MediaStream>> getRemoteStreams() const override;
+    //Vector<RefPtr<MediaStream>> getRemoteStreams() const override;
 
     Ref<RTCRtpReceiver> createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId) override;
     void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&) override;
@@ -76,6 +76,9 @@ public:
     void clearNegotiationNeededState() override { m_negotiationNeeded = false; };
 
     void emulatePlatformEvent(const String& action) override;
+
+    std::unique_ptr<RTCDataChannelHandler> createDataChannel(const String&, const Dictionary&) override;
+    Vector<RefPtr<MediaStream>> getRemoteStreams() const override;
 
 private:
     void runTask(Function<void ()>&&);

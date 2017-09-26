@@ -107,6 +107,8 @@ static void releaseCriticalMemory(Synchronous synchronous)
             document->styleScope().clearResolver();
     }
 
+    static bool enableCodeDeltion = !!getenv("WPE_ENABLE_JIT_CODE_DELETION");
+    if (enableCodeDeltion)
     {
         MemoryPressureHandler::ReliefLogger log("Discard all JIT-compiled code");
         GCController::singleton().deleteAllCode();
@@ -164,7 +166,25 @@ void releaseMemory(Critical critical, Synchronous synchronous)
 
 #if !PLATFORM(COCOA)
 void platformReleaseMemory(Critical) { }
-void jettisonExpensiveObjectsOnTopLevelNavigation() { }
+void jettisonExpensiveObjectsOnTopLevelNavigation()
+{
+    // based on code from cocoa/MemoryReleaseCocoa.mm
+    // Protect against doing excessive jettisoning during repeated navigations.
+    const auto minimumTimeSinceNavigation = 2s;
+
+    auto now = std::chrono::steady_clock::now();
+    static auto timeOfLastNavigation = now;
+    bool shouldJettison = (timeOfLastNavigation == now) || (now - timeOfLastNavigation >= minimumTimeSinceNavigation);
+    timeOfLastNavigation = now;
+
+    if (!shouldJettison)
+        return;
+
+    RunLoop::main().dispatch([]{
+        GCController::singleton().deleteAllCode();
+        releaseMemory(Critical::Yes, Synchronous::Yes);
+    });
+}
 void registerMemoryReleaseNotifyCallbacks() { }
 #endif
 

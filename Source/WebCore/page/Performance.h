@@ -38,6 +38,8 @@
 #include "EventTarget.h"
 #include "ExceptionOr.h"
 
+#include "PerformanceMemoryInfo.h"
+
 namespace WebCore {
 
 class Document;
@@ -57,6 +59,8 @@ public:
     PerformanceNavigation& navigation();
     PerformanceTiming& timing();
     double now() const;
+
+    RefPtr<PerformanceMemoryInfo> memory() const;
 
     Vector<RefPtr<PerformanceEntry>> getEntries() const;
     Vector<RefPtr<PerformanceEntry>> getEntriesByType(const String& entryType) const;

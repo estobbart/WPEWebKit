@@ -30,6 +30,18 @@
 #include <open_cdm.h>
 #include <wtf/text/WTFString.h>
 
+#if USE(SVP)
+#include <gst_brcm_svp_meta.h>
+#include "b_secbuf.h"
+
+struct Rpc_Secbuf_Info {
+    uint8_t *ptr;
+    uint32_t type;
+    size_t   size;
+    void    *token;
+};
+#endif
+
 #define GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), WEBKIT_TYPE_OPENCDM_DECRYPT, WebKitOpenCDMDecryptPrivate))
 
 struct _WebKitOpenCDMDecryptPrivate {
@@ -96,14 +108,22 @@ static gboolean webKitMediaOpenCDMDecryptorHandleKeyResponse(WebKitMediaCommonEn
     WebKitOpenCDMDecryptPrivate* priv = GST_WEBKIT_OPENCDM_DECRYPT_GET_PRIVATE(WEBKIT_OPENCDM_DECRYPT(self));
     ASSERT(temporarySession);
 
-    priv->m_session = temporarySession.get();
-    priv->m_openCdm = std::make_unique<media::OpenCdm>();
-    priv->m_openCdm->SelectSession(priv->m_session.utf8().data());
+    if(priv->m_session != temporarySession.get() ) {
+        priv->m_session = temporarySession.get();
+        GST_WARNING_OBJECT(self, "selecting session %s", priv->m_session.utf8().data());
+        priv->m_openCdm = std::make_unique<media::OpenCdm>();
+        priv->m_openCdm->SelectSession(priv->m_session.utf8().data());
+    }else{
+        GST_WARNING_OBJECT(self, "session already selected! %s", priv->m_session.utf8().data());
+    }
     return true;
 }
 
 static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDecrypt* self, GstBuffer* ivBuffer, GstBuffer* buffer, unsigned subSampleCount, GstBuffer* subSamplesBuffer)
 {
+#if USE(SVP)
+    struct Rpc_Secbuf_Info sb_info;
+#endif
     GstMapInfo ivMap;
     if (!gst_buffer_map(ivBuffer, &ivMap, GST_MAP_READ)) {
         GST_ERROR_OBJECT(self, "Failed to map IV");
@@ -131,6 +151,7 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
         }
 
         GUniquePtr<GstByteReader> reader(gst_byte_reader_new(subSamplesMap.data, subSamplesMap.size));
+
         uint16_t inClear = 0;
         uint32_t inEncrypted = 0;
         uint32_t totalEncrypted = 0;
@@ -143,50 +164,144 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
         }
         gst_byte_reader_set_pos(reader.get(), 0);
 
-        // Build a new buffer storing the entire encrypted cipher.
-        GUniquePtr<uint8_t> holdEncryptedData(reinterpret_cast<uint8_t*>(malloc(totalEncrypted)));
-        uint8_t* encryptedData = holdEncryptedData.get();
-        unsigned index = 0;
-        for (position = 0; position < subSampleCount; position++) {
-            gst_byte_reader_get_uint16_be(reader.get(), &inClear);
-            gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
-            memcpy(encryptedData, map.data + index + inClear, inEncrypted);
-            index += inClear + inEncrypted;
-            encryptedData += inEncrypted;
+        if (totalEncrypted > 0)
+        {
+#if USE(SVP)
+            brcm_svp_meta_data_t * ptr = (brcm_svp_meta_data_t *) g_malloc(sizeof(brcm_svp_meta_data_t));
+            if (ptr) {
+                uint32_t chunks_cnt = 0;
+                svp_chunk_info * ci = NULL;
+                //uint32_t clear_start = 0;
+                memset((uint8_t *)ptr, 0, sizeof(brcm_svp_meta_data_t));
+                ptr->sub_type = GST_META_BRCM_SVP_TYPE_2;
+                // The next line need to change to assign the opaque handle after calling ->processPayload()
+                ptr->u.u2.secbuf_ptr = NULL; //pData;
+                chunks_cnt = subSampleCount;
+                ptr->u.u2.chunks_cnt = chunks_cnt;
+                if (chunks_cnt) {
+                    ci = (svp_chunk_info *)g_malloc(chunks_cnt * sizeof(svp_chunk_info));
+                    ptr->u.u2.chunk_info = ci;
+                }
+            }
+            GST_TRACE_OBJECT(self, "[HHH] subSampleCount=%i.\n", subSampleCount);
+            totalEncrypted += sizeof(Rpc_Secbuf_Info); //make sure enough data for metadata
+#endif        
+
+            // Build a new buffer storing the entire encrypted cipher.
+            GUniquePtr<uint8_t> holdEncryptedData(reinterpret_cast<uint8_t*>(malloc(totalEncrypted)));
+            uint8_t* encryptedData = holdEncryptedData.get();
+            unsigned index = 0;
+            for (position = 0; position < subSampleCount; position++) {
+                gst_byte_reader_get_uint16_be(reader.get(), &inClear);
+                gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
+                memcpy(encryptedData, map.data + index + inClear, inEncrypted);
+                index += inClear + inEncrypted;
+                encryptedData += inEncrypted;
+#if USE(SVP)
+                if (ptr && ptr->u.u2.chunks_cnt > 0 && ptr->u.u2.chunk_info) {
+                    svp_chunk_info * ci = ptr->u.u2.chunk_info;
+                    ci[position].clear_size = inClear;
+                    ci[position].encrypted_size = inEncrypted;
+                }
+#endif
+            }
+            gst_byte_reader_set_pos(reader.get(), 0);
+
+            // Decrypt cipher.
+            if (errorCode = priv->m_openCdm->Decrypt(holdEncryptedData.get(), static_cast<uint32_t>(totalEncrypted),
+                ivMap.data, static_cast<uint32_t>(ivMap.size))) {
+                GST_WARNING_OBJECT(self, "ERROR - packet decryption failed [%d]", errorCode);
+                gst_buffer_unmap(subSamplesBuffer, &subSamplesMap);
+                returnValue = false;
+                goto beach;
+            }
+
+#if USE(SVP)
+            // Update the opaque handle and push the metadata to gstbuffer
+            GST_TRACE_OBJECT(self, "\n[HHH] after decryption with subsamples.\n");
+            encryptedData = holdEncryptedData.get(); 
+            if (ptr) {
+                memcpy(&sb_info, encryptedData, sizeof(Rpc_Secbuf_Info));
+                GST_TRACE_OBJECT(self, "[HHH] sb_inf: ptr=%p, type=%i, size=%i, token=%p\n", sb_info.ptr, sb_info.type, sb_info.size, sb_info.token);
+                if (B_Secbuf_AllocWithToken(sb_info.size, (B_Secbuf_Type)sb_info.type, sb_info.token, &sb_info.ptr)) {
+                    GST_ERROR_OBJECT(self, "[HHH] B_Secbuf_AllocWithToken() failed!\n");
+                } else {
+                    GST_TRACE_OBJECT(self, "[HHH] B_Secbuf_AllocWithToken() succeeded.\n");
+                }
+                ptr->u.u2.secbuf_ptr = sb_info.ptr; //assign the handle here!
+                gst_buffer_add_brcm_svp_meta(buffer, ptr);
+            }
+#else
+            // Re-build sub-sample data.
+            index = 0;
+            encryptedData = holdEncryptedData.get();
+            unsigned total = 0;
+            for (position = 0; position < subSampleCount; position++) {
+                gst_byte_reader_get_uint16_be(reader.get(), &inClear);
+                gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
+
+                memcpy(map.data + total + inClear, encryptedData + index, inEncrypted);
+                index += inEncrypted;
+                total += inClear + inEncrypted;
+            }
+#endif
+        } else {
+            GST_ERROR_OBJECT(self, "totalEncrypted is 0, not calling decrypt() !");
         }
-        gst_byte_reader_set_pos(reader.get(), 0);
-
-        // Decrypt cipher.
-        if (errorCode = priv->m_openCdm->Decrypt(holdEncryptedData.get(), static_cast<uint32_t>(totalEncrypted),
-            ivMap.data, static_cast<uint32_t>(ivMap.size))) {
-            GST_WARNING_OBJECT(self, "ERROR - packet decryption failed [%d]", errorCode);
-            gst_buffer_unmap(subSamplesBuffer, &subSamplesMap);
-            returnValue = false;
-            goto beach;
-        }
-
-        // Re-build sub-sample data.
-        index = 0;
-        encryptedData = holdEncryptedData.get();
-        unsigned total = 0;
-        for (position = 0; position < subSampleCount; position++) {
-            gst_byte_reader_get_uint16_be(reader.get(), &inClear);
-            gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
-
-            memcpy(map.data + total + inClear, encryptedData + index, inEncrypted);
-            index += inEncrypted;
-            total += inClear + inEncrypted;
-        }
-
         gst_buffer_unmap(subSamplesBuffer, &subSamplesMap);
     } else {
+        uint8_t* encryptedData;
+        uint8_t* fEncryptedData;
+        uint32_t totalEncryptedSize = 0;
+#if USE(SVP)
+        brcm_svp_meta_data_t * ptr = (brcm_svp_meta_data_t *) g_malloc(sizeof(brcm_svp_meta_data_t));
+        if (ptr) {
+            svp_chunk_info * ci = NULL;
+            memset((uint8_t *)ptr, 0, sizeof(brcm_svp_meta_data_t));
+            ptr->sub_type = GST_META_BRCM_SVP_TYPE_2;
+            // The next line need to change to assign the opaque handle after calling ->processPayload()
+            ptr->u.u2.secbuf_ptr = NULL; //pData;
+            ptr->u.u2.chunks_cnt = 1;
+
+            ci = (svp_chunk_info *)g_malloc(sizeof(svp_chunk_info));
+            ptr->u.u2.chunk_info = ci;
+            ci[0].clear_size = 0;
+            ci[0].encrypted_size = map.size;
+
+            totalEncryptedSize = map.size + sizeof(Rpc_Secbuf_Info); //make sure it is enough for metadata
+            encryptedData = (uint8_t*) g_malloc(totalEncryptedSize);
+            fEncryptedData = encryptedData;
+            memcpy(encryptedData, map.data, map.size);
+        }
+#else
+        encryptedData = map.data;
+        fEncryptedData = encryptedData;
+        totalEncryptedSize = map.size;
+#endif        
         // Decrypt cipher.
-        if (errorCode = priv->m_openCdm->Decrypt(map.data, static_cast<uint32_t>(map.size),
+        if (errorCode = priv->m_openCdm->Decrypt(encryptedData, static_cast<uint32_t>(totalEncryptedSize),
             ivMap.data, static_cast<uint32_t>(ivMap.size))) {
             GST_WARNING_OBJECT(self, "ERROR - packet decryption failed [%d]", errorCode);
             returnValue = false;
+            g_free(fEncryptedData);
             goto beach;
         }
+#if USE(SVP)
+        // Update the opaque handle and push the metadata to gstbuffer
+        GST_TRACE_OBJECT(self, "[HHH] after decryption - single sample buffer\n");
+        if (ptr) {
+            memcpy(&sb_info, fEncryptedData, sizeof(Rpc_Secbuf_Info));
+            GST_TRACE_OBJECT(self, "[HHH] sb_inf: ptr=%p, type=%i, size=%i, token=%p\n", sb_info.ptr, sb_info.type, sb_info.size, sb_info.token);
+            if (B_Secbuf_AllocWithToken(sb_info.size, (B_Secbuf_Type)sb_info.type, sb_info.token, &sb_info.ptr)) {
+                GST_ERROR_OBJECT(self, "[HHH] B_Secbuf_AllocWithToken() failed!\n");
+            } else {
+                GST_TRACE_OBJECT(self, "[HHH] B_Secbuf_AllocWithToken() succeeded.\n");
+            }
+            ptr->u.u2.secbuf_ptr = sb_info.ptr; //assign the handle here!
+            gst_buffer_add_brcm_svp_meta(buffer, ptr);
+        }
+        g_free(fEncryptedData);
+#endif        
     }
 
 beach:

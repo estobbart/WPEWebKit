@@ -66,6 +66,8 @@ private:
     DecodingState m_decodingState { NeverDecoded };
 
     RefPtr<TextResourceDecoder> m_decoder;
+
+    bool m_ytOverridesInjected { false };
 };
 
 } // namespace WebCore
