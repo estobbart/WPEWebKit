@@ -156,13 +156,21 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
         uint32_t inEncrypted = 0;
         uint32_t totalEncrypted = 0;
         unsigned position;
+        unsigned total = 0;
         // Find out the total size of the encrypted data.
         for (position = 0; position < subSampleCount; position++) {
             gst_byte_reader_get_uint16_be(reader.get(), &inClear);
             gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
             totalEncrypted += inEncrypted;
+            total += + inClear + inEncrypted;
         }
         gst_byte_reader_set_pos(reader.get(), 0);
+
+        if (total != map.size) {
+            GST_ERROR_OBJECT(self, "Subsample byte total != buffer.size, unable to decrypt");
+            returnValue = false;
+            goto beach;
+        }
 
         if (totalEncrypted > 0)
         {
@@ -185,7 +193,7 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
             }
             GST_TRACE_OBJECT(self, "[HHH] subSampleCount=%i.\n", subSampleCount);
             totalEncrypted += sizeof(Rpc_Secbuf_Info); //make sure enough data for metadata
-#endif        
+#endif
 
             // Build a new buffer storing the entire encrypted cipher.
             GUniquePtr<uint8_t> holdEncryptedData(reinterpret_cast<uint8_t*>(malloc(totalEncrypted)));
@@ -219,7 +227,7 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
 #if USE(SVP)
             // Update the opaque handle and push the metadata to gstbuffer
             GST_TRACE_OBJECT(self, "\n[HHH] after decryption with subsamples.\n");
-            encryptedData = holdEncryptedData.get(); 
+            encryptedData = holdEncryptedData.get();
             if (ptr) {
                 memcpy(&sb_info, encryptedData, sizeof(Rpc_Secbuf_Info));
                 GST_TRACE_OBJECT(self, "[HHH] sb_inf: ptr=%p, type=%i, size=%i, token=%p\n", sb_info.ptr, sb_info.type, sb_info.size, sb_info.token);
@@ -235,7 +243,7 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
             // Re-build sub-sample data.
             index = 0;
             encryptedData = holdEncryptedData.get();
-            unsigned total = 0;
+            total = 0;
             for (position = 0; position < subSampleCount; position++) {
                 gst_byte_reader_get_uint16_be(reader.get(), &inClear);
                 gst_byte_reader_get_uint32_be(reader.get(), &inEncrypted);
@@ -245,10 +253,12 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
                 total += inClear + inEncrypted;
             }
 #endif
-        } else {
-            GST_ERROR_OBJECT(self, "totalEncrypted is 0, not calling decrypt() !");
         }
         gst_buffer_unmap(subSamplesBuffer, &subSamplesMap);
+        if (totalEncrypted == 0) {
+            GST_WARNING_OBJECT(self, "totalEncrypted is 0, not calling decrypt()");
+            return returnValue;
+        }
     } else {
         uint8_t* encryptedData;
         uint8_t* fEncryptedData;
@@ -277,7 +287,7 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
         encryptedData = map.data;
         fEncryptedData = encryptedData;
         totalEncryptedSize = map.size;
-#endif        
+#endif
         // Decrypt cipher.
         if (errorCode = priv->m_openCdm->Decrypt(encryptedData, static_cast<uint32_t>(totalEncryptedSize),
             ivMap.data, static_cast<uint32_t>(ivMap.size))) {
@@ -301,7 +311,7 @@ static gboolean webKitMediaOpenCDMDecryptorDecrypt(WebKitMediaCommonEncryptionDe
             gst_buffer_add_brcm_svp_meta(buffer, ptr);
         }
         g_free(fEncryptedData);
-#endif        
+#endif
     }
 
 beach:
