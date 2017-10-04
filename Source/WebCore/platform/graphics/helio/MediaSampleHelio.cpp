@@ -13,26 +13,60 @@ namespace WebCore {
 
 MediaTime MediaSampleHelio::presentationTime() const {
     // printf("presentationTime\n");
+    rcv_node_t *box = rcv_node_child(m_sample, "trun");
+    if (box) {
+        rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
+        MediaTime _decodeTime = this->decodeTime();
+        double pts = rcv_trun_first_presentation_time(trun, _decodeTime.toDouble(), m_timescale);
+        //printf("m_timescale %u\n", m_timescale);
+        printf("PRESENTATION TIME:%f\n", pts);
+        return MediaTime::createWithDouble(pts);
+    }
+
+    // double rcv_trun_first_presentation_time(rcv_trun_box_t *trun, double decode_time, uint32_t timescale);
     return MediaTime::createWithDouble(0);
     //return toMediaTime(CMSampleBufferGetPresentationTimeStamp(m_sample.get()));
 }
 
 MediaTime MediaSampleHelio::decodeTime() const {
+    rcv_node_t *box = rcv_node_child(m_sample, "tfdt");
+    if (box) {
+        rcv_tfdt_box_t *tfdt = RCV_TFDT_BOX(rcv_node_raw(box));
+        double dts = rcv_tfdt_decode_time_seconds(tfdt, m_timescale);
+        //printf("m_timescale %u\n", m_timescale);
+        printf("DECODE TIME:%f\n", dts);
+        return MediaTime::createWithDouble(dts);
+    }
     // printf("decodeTime\n");
     return MediaTime::createWithDouble(0);
 }
 
 MediaTime MediaSampleHelio::duration() const {
     // printf("duration\n");
+    rcv_node_t *box = rcv_node_child(m_sample, "trun");
+    if (box) {
+        rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
+        double duration = rcv_trun_duration(trun, m_timescale);
+        //printf("m_timescale %u\n", m_timescale);
+        printf("DURATION TIME:%f\n", duration);
+        return MediaTime::createWithDouble(duration);
+    }
     return MediaTime::createWithDouble(0);
 }
 
 size_t MediaSampleHelio::sizeInBytes() const {
-    printf("sizeInBytes\n");
-    return 0;//m_sample->size;
+    rcv_node_t *node = rcv_node_child(m_sample, "mdat");
+    if (node) {
+        rcv_mdat_box_t *mdat = RCV_MDAT_BOX(rcv_node_raw(node));
+        size_t size = rcv_mdat_data_size(mdat);
+        printf("sizeInBytes:%zu \n", size);
+        return size;
+    }
+    return 0;
 }
 
 FloatSize MediaSampleHelio::presentationSize() const {
+    // TODO: This is only in the init header
     printf("presentationSize\n");
     return FloatSize();
 }
@@ -58,7 +92,7 @@ std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> MediaSampleHelio::divide(con
 
 Ref<MediaSample> MediaSampleHelio::createNonDisplayingCopy() const {
     printf("createNonDisplayingCopy\n");
-    return MediaSampleHelio::create(NULL);
+    return MediaSampleHelio::create(NULL, 0);
 }
 
 MediaSample::SampleFlags MediaSampleHelio::flags() const {

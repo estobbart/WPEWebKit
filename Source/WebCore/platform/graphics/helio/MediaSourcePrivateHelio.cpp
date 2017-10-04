@@ -8,6 +8,7 @@
 
 #include "MediaSourcePrivateHelio.h"
 #include "SourceBufferPrivateHelio.h"
+#include "MediaPlayerPrivateHelio.h"
 
 namespace WebCore {
 
@@ -15,12 +16,14 @@ RefPtr<MediaSourcePrivateHelio> MediaSourcePrivateHelio::create(MediaPlayerPriva
                                                                 MediaSourcePrivateClient* client) {
     printf("MediaSourcePrivateHelio create\n");
     RefPtr<MediaSourcePrivateHelio> mediaSourcePrivate = adoptRef(new MediaSourcePrivateHelio(parent, client));
+    printf("... client->setPrivateAndOpen\n");
     client->setPrivateAndOpen(*mediaSourcePrivate);
     return mediaSourcePrivate;
 }
 
-MediaSourcePrivateHelio::MediaSourcePrivateHelio(MediaPlayerPrivateHelio*, MediaSourcePrivateClient*)
-  : m_readyState(MediaPlayer::HaveNothing) {
+MediaSourcePrivateHelio::MediaSourcePrivateHelio(MediaPlayerPrivateHelio* helioPlayer, MediaSourcePrivateClient*)
+  : m_mediaPlayer(helioPlayer)
+  , m_readyState(MediaPlayer::HaveNothing) {
     printf("MediaSourcePrivateHelio constructor\n");
 }
 
@@ -59,6 +62,7 @@ MediaSourcePrivate::AddStatus MediaSourcePrivateHelio::addSourceBuffer(const Con
   //     return MediaSourcePrivate::ReachedIdLimit;
   // }
 
+  // TODO: We know the content type here.. so we should pass that along.
   m_sourceBuffers.append(SourceBufferPrivateHelio::create(this));
   sourceBufferPrivate = m_sourceBuffers.last();
 
@@ -108,6 +112,11 @@ void MediaSourcePrivateHelio::waitForSeekCompleted() {
 
 void MediaSourcePrivateHelio::seekCompleted() {
     printf("MediaSourcePrivateHelio seekCompleted\n");
+}
+
+void MediaSourcePrivateHelio::sourceBufferPrivateActiveStateChanged(bool isActive __attribute__((unused))){
+    printf("MediaSourcePrivateHelio sourceBufferPrivateActiveStateChanged\n");
+    m_mediaPlayer->mediaSourcePrivateActiveSourceBuffersChanged();
 }
 
 }

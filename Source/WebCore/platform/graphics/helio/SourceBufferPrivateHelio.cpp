@@ -3,9 +3,9 @@
 
 #include "SourceBufferPrivateHelio.h"
 #include "MediaSampleHelio.h"
-#include "MediaDescription.h"
 #include "VideoTrackPrivateHelio.h"
 #include "AudioTrackPrivateHelio.h"
+#include "MediaSourcePrivateHelio.h"
 //#include "InbandTextTrackPrivate.h"
 
 
@@ -16,36 +16,54 @@
 
 namespace WebCore {
 
-class MediaDescriptionHelio final : public MediaDescription {
-public:
-    static RefPtr<MediaDescriptionHelio> create(void *track) { return adoptRef(new MediaDescriptionHelio(track)); }
-    virtual ~MediaDescriptionHelio() { }
 
-    AtomicString codec() const override { return m_codec; }
-    bool isVideo() const override { return m_isVideo; }
-    bool isAudio() const override { return m_isAudio; }
-    bool isText() const override { return m_isText; }
+// static void _ftyp_box_callback(void *ctx, rcv_node_t *box) {
+//     // TODO:
+//     // 1. A File Type Box contains a major_brand or compatible_brand that the
+//     // user agent does not support.
+//     // printf("_ftyp_box_callback");
+// }
 
-protected:
-    MediaDescriptionHelio(void *track)
-        : m_isVideo(0)
-        , m_isAudio(0)
-        , m_isText(0)
-    {
-        // NSArray* formatDescriptions = [track formatDescriptions];
-        // CMFormatDescriptionRef description = [formatDescriptions count] ? (CMFormatDescriptionRef)[formatDescriptions objectAtIndex:0] : 0;
-        // if (description) {
-        //     FourCharCode codec = CMFormatDescriptionGetMediaSubType(description);
-        //     m_codec = AtomicString(reinterpret_cast<LChar*>(&codec), 4);
-        // }
-        m_codec = nullAtom;//AtomicString(track->codec);
-    }
+// static void _frma_box_callback(void *ctx, rcv_node_t *box) {
+//     // TODO:
+//     // 2. A box or field in the Movie Box is encountered that violates the
+//     // requirements mandated by the major_brand or one of the compatible_brands
+//     // in the File Type Box.
+//     // printf("_frma_box_callback");
+//
+//     /*
+//
+//     ftyp
+//     mp41
+//
+//     stsd->mp4a
+//
+//
+//     */
+//     rcv_frma_box_t *frma = RCV_FRMA_BOX(rcv_node_raw(box));
+//     char *format = rcv_frma_format(frma);
+//
+//     SourceBufferPrivateHelio *sbHelio = (SourceBufferPrivateHelio *)ctx;
+//     sbHelio->setTrackDescription(MediaDescriptionHelio::create(format));
+// }
 
-    AtomicString m_codec;
-    bool m_isVideo;
-    bool m_isAudio;
-    bool m_isText;
-};
+// static void _track_box_callback(void *ctx, rcv_node_t *box) {
+//     // TODO:
+//     // 3. The tracks in the Movie Box contain samples (i.e., the entry_count in
+//     // the stts, stsc or stco boxes are not set to zero).
+//     // printf("_track_box_callback");
+// }
+
+// static void _mvex_box_callback(void *ctx, rcv_node_t *box) {
+//     // TODO:
+//     // 4. A Movie Extends (mvex) box is not contained in the Movie (moov) box to
+//     // indicate that Movie Fragments are to be expected.
+//     // printf("_mvex_box_callback");
+// }
+
+
+
+
 
 
 // TODO: Move all these to calls on the main thread..
@@ -157,11 +175,27 @@ RefPtr<SourceBufferPrivateHelio> SourceBufferPrivateHelio::create(MediaSourcePri
     return adoptRef(new SourceBufferPrivateHelio(parent));
 }
 
-SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaSourcePrivateHelio* parent __attribute__((unused)))
-  : m_readyState(MediaPlayer::HaveNothing) {
+SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaSourcePrivateHelio* parent)
+  : m_mediaSource(parent)
+  , m_weakFactory(this)
+  , m_readyState(MediaPlayer::HaveNothing) {
       printf("SourceBufferPrivateHelio constructor\n");
       // TODO: Fix this in helio..
-    //   static const hve_event_callback_t callbacks[] = {
+      //   static const hve_event_callback_t callbacks[] = {
+      //     { hve_ready_event,  hve_ready_handler },
+      //     { hve_track_info_event,  hve_track_info_handler },
+      //     { hve_media_sample_event, hve_media_sample_handler },
+      //     { hve_demux_start_event, hve_demux_start_handler },
+      //     { hve_demux_complete_event, hve_demux_complete_handler },
+      //     { NULL, NULL }
+      //   };
+      //   if (!m_helio) {
+      //       m_helio = helio_init(this, callbacks);
+      //   }
+
+    // NOTE(estobb200): We do two things here.. the callbacks only listen
+    // for isobmff init segmenets, once it's detected, we report it back.
+    // static const hve_event_callback_t callbacks[] = {
     //     { hve_ready_event,  hve_ready_handler },
     //     { hve_track_info_event,  hve_track_info_handler },
     //     { hve_media_sample_event, hve_media_sample_handler },
@@ -169,16 +203,26 @@ SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaSourcePrivateHelio* pare
     //     { hve_demux_complete_event, hve_demux_complete_handler },
     //     { NULL, NULL }
     //   };
-    //   if (!m_helio) {
-    //       m_helio = helio_init(this, callbacks);
-    //   }
+
+    // static const rcv_box_listener_t callbacks[] = {
+    //     { "ftyp", _ftyp_box_callback },
+    //     { "frma", _frma_box_callback },
+    //     { "stts", _track_box_callback },
+    //     { "stsc", _track_box_callback },
+    //     { "stco", _track_box_callback },
+    //     { "mvex", _mvex_box_callback },
+    //     // { "tkhd", _tkhd_box_callback },
+    //     { NULL, NULL }
+    // };
+
+    m_rcvmfParser = rcv_parser_init(NULL, NULL);
 }
 
 SourceBufferPrivateHelio::~SourceBufferPrivateHelio() {
     printf("SourceBufferPrivateHelio destructor\n");
-    // if (m_helio) {
-    //     helio_destroy(m_helio);
-    // }
+    if (m_rcvmfParser) {
+        rcv_parser_destroy(&m_rcvmfParser);
+    }
 }
 
 void SourceBufferPrivateHelio::setClient(SourceBufferPrivateClient* client) {
@@ -194,12 +238,207 @@ void SourceBufferPrivateHelio::setClient(SourceBufferPrivateClient* client) {
  * required to decode a sequence of media segments. This includes codec
  * initialization data, Track ID mappings for multiplexed segments, and
  * timestamp offsets (e.g. edit lists).
+ *
+ * https://www.w3.org/TR/mse-byte-stream-format-isobmff/#iso-media-segments
+ *
  */
 void SourceBufferPrivateHelio::append(const unsigned char* data,
                                       unsigned length) {
     printf("SourceBufferPrivateHelio append size:%i\n", length);
 
+    if (!m_client) {
+        return;
+    }
+
+    // WeakPtr<SourceBufferPrivateHelio> weakThis = createWeakPtr();
     //helio_enque_data(m_helio, data, length);
+
+    rcv_node_t *root = rcv_node_init();
+    rcv_parse_isobmff(m_rcvmfParser, root, data, length);
+    rcv_node_t *box;
+
+    printf("rcv_parse_isobmff(m_rcvmfParser, root, data, length);\n");
+
+    if (rcv_node_child(root, "mdat")) {
+        // callOnMainThread([weakThis, root] {
+        //     weakThis->didDetectISOBMFFSegment(root);
+        // });
+
+        Ref<MediaSample> mediaSample = MediaSampleHelio::create(root, m_timescale);
+
+        printf("sourceBufferPrivateDidReceiveSample\n");
+        m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
+
+        printf("sourceBufferPrivateAppendComplete SAMPLES\n");
+        m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::AppendSucceeded);
+
+        return;
+    }
+
+    box = rcv_node_child(root, "tkhd");
+    if (box) {
+        // callOnMainThread([weakThis, root] {
+        //     weakThis->didDetectISOBMFFHeader(root);
+        // });
+
+        // printf("initSegment.... \n");
+        // init segment
+      
+        rcv_tkhd_box_t *tkhd = RCV_TKHD_BOX(rcv_node_raw(box));
+
+        // printf("segment .... \n");
+        SourceBufferPrivateClient::InitializationSegment segment;
+        // TODO: Theres a few different durations, but we don't use that value
+        // in the live segments.
+        // printf("MediaTime .... \n");
+        segment.duration = MediaTime();
+        // printf("rcv_tkhd_track_id .... \n");
+        uint32_t id = rcv_tkhd_track_id(tkhd);
+      
+      
+        box = rcv_node_child(root, "mvhd");
+        if (box) {
+            rcv_mvhd_box_t *mvhd = RCV_MVHD_BOX(rcv_node_raw(box));
+            m_timescale = rcv_mvhd_timescale(mvhd);
+            if (m_timescale == 0) {
+                printf("MVHD DID NOT RETURN PROPER TIMESCALE USING 90000\n");
+                m_timescale = 90000;
+            }
+        } else {
+            printf("NO SUCH MVHD BOX MVHD TIMESCALE USING 90000\n");
+            m_timescale = 90000;
+        }
+
+        box = rcv_node_child(root, "stsd");
+        box = rcv_node_first_child(box);
+        char *codec = rcv_node_type(box);
+
+        // printf("rcv_node_child .... \n");
+        rcv_node_t *child_box = rcv_node_child(root, "hdlr");
+        if (child_box) {
+            // printf("rcv_node_raw hdlr .... \n");
+            rcv_hdlr_box_t *hdlr = RCV_HDLR_BOX(rcv_node_raw(child_box));
+            // printf("format request \n");
+
+            // TODO: Audio samples.. Video Samples flags..
+            char *format = rcv_hdlr_handler_type(hdlr);
+
+            printf("rcv_stsd_sample_entry_type... %s\n", format);
+
+            if (strcmp(format, "vide") == 0) {
+                SourceBufferPrivateClient::InitializationSegment::VideoTrackInformation vtInfo;
+                vtInfo.track = VideoTrackPrivateHelio::create(id);
+                vtInfo.description = MediaDescriptionHelio::create(codec);
+                printf("VideoTrackPrivateHelio m_id:%s\n", vtInfo.track->id().string().utf8().data());
+
+                segment.videoTracks.append(vtInfo);
+            } else if (strcmp(format, "soun") == 0) {
+                SourceBufferPrivateClient::InitializationSegment::AudioTrackInformation atInfo;
+                atInfo.track = AudioTrackPrivateHelio::create(id);
+                atInfo.description = MediaDescriptionHelio::create(codec);
+
+                printf("AudioTrackPrivateHelio m_id:%s\n", atInfo.track->id().string().utf8().data());
+                segment.audioTracks.append(atInfo);
+            }
+
+
+            printf("sourceBufferPrivateDidReceiveInitializationSegment\n");
+            m_client->sourceBufferPrivateDidReceiveInitializationSegment(this, segment);
+
+            printf("sourceBufferPrivateAppendComplete\n");
+            m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::AppendSucceeded);
+
+        } else {
+            printf("sourceBufferPrivateAppendComplete FAILED!!\n");
+            m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::ParsingFailed);
+        }
+
+        rcv_destory_tree(&root);
+
+        return;
+    }
+
+    // TODO: Move this to the main thread..
+    printf("sourceBufferPrivateAppendComplete ParsingFailed\n");
+    //m_client->sourceBufferPrivateAppendComplete(weakThis, SourceBufferPrivateClient::ParsingFailed);
+
+}
+
+void SourceBufferPrivateHelio::didDetectISOBMFFHeader(rcv_node_t *root) {
+    // printf("initSegment.... \n");
+    // init segment
+    rcv_node_t *box = rcv_node_child(root, "tkhd");
+    rcv_tkhd_box_t *tkhd = RCV_TKHD_BOX(rcv_node_raw(box));
+
+    // printf("segment .... \n");
+    SourceBufferPrivateClient::InitializationSegment segment;
+    // TODO: Theres a few different durations, but we don't use that value
+    // in the live segments.
+    // printf("MediaTime .... \n");
+    segment.duration = MediaTime();
+    // printf("rcv_tkhd_track_id .... \n");
+    uint32_t id = rcv_tkhd_track_id(tkhd);
+
+    // printf("rcv_node_child .... \n");
+    rcv_node_t *child_box = rcv_node_child(root, "hdlr");
+    if (child_box) {
+        // printf("rcv_node_raw hdlr .... \n");
+        rcv_hdlr_box_t *hdlr = RCV_HDLR_BOX(rcv_node_raw(child_box));
+        // printf("format request \n");
+
+        // TODO: Audio samples.. Video Samples flags..
+        char *format = rcv_hdlr_handler_type(hdlr);
+
+        printf("rcv_stsd_sample_entry_type... %s\n", format);
+
+        if (strcmp(format, "vide") == 0) {
+            SourceBufferPrivateClient::InitializationSegment::VideoTrackInformation vtInfo;
+            vtInfo.track = VideoTrackPrivateHelio::create(id);
+            //vtInfo.description = m_trackDescription;
+            printf("VideoTrackPrivateHelio m_id:%s\n", vtInfo.track->id().string().utf8().data());
+
+            segment.videoTracks.append(vtInfo);
+        } else if (strcmp(format, "soun") == 0) {
+            SourceBufferPrivateClient::InitializationSegment::AudioTrackInformation atInfo;
+            atInfo.track = AudioTrackPrivateHelio::create(id);
+            //atInfo.description = m_trackDescription;
+
+            printf("AudioTrackPrivateHelio m_id:%s\n", atInfo.track->id().string().utf8().data());
+            segment.audioTracks.append(atInfo);
+        }
+
+
+        printf("sourceBufferPrivateDidReceiveInitializationSegment\n");
+        m_client->sourceBufferPrivateDidReceiveInitializationSegment(this, segment);
+
+        printf("sourceBufferPrivateAppendComplete\n");
+        m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::AppendSucceeded);
+
+    } else {
+        printf("sourceBufferPrivateAppendComplete FAILED!!\n");
+        m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::ParsingFailed);
+    }
+
+    rcv_destory_tree(&root);
+
+}
+
+void SourceBufferPrivateHelio::didDetectISOBMFFSegment(rcv_node_t *root) {
+    // samples..
+    uint32_t timescale = 9000;
+//    rcv_node_t *box = rcv_node_child(root, "mvhd");
+//    if (box) {
+//        rcv_mvhd_box_t *mvhd = RCV_MVHD_BOX(rcv_node_raw(box));
+//        timescale = rcv_mvhd_timescale(mvhd);
+//    }
+
+    Ref<MediaSample> mediaSample = MediaSampleHelio::create(root, timescale);
+
+    printf("sourceBufferPrivateDidReceiveSample");
+    m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
+
+    printf("sourceBufferPrivateAppendComplete SAMPLES");
+    m_client->sourceBufferPrivateAppendComplete(this, SourceBufferPrivateClient::AppendSucceeded);
 }
 
 void SourceBufferPrivateHelio::abort() {
@@ -233,7 +472,7 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample>, AtomicStri
 }
 
 bool SourceBufferPrivateHelio::isReadyForMoreSamples(AtomicString as) {
-    printf("SourceBufferPrivateHelio isReadyForMoreSamples:%s true\n", as.string().utf8().data());
+    printf("SourceBufferPrivateHelio isReadyForMoreSamples:%s false\n", as.string().utf8().data());
     /* if true...
         trackBuffer.decodeQueue.empty(): 0
         SourceBufferPrivateHelio isReadyForMoreSamples:256 true
@@ -268,7 +507,11 @@ bool SourceBufferPrivateHelio::isReadyForMoreSamples(AtomicString as) {
 }
 
 void SourceBufferPrivateHelio::setActive(bool active) {
+    // TODO: At this point we should assume we're going to need a a/v pipeline
+    // for this content.
     printf("SourceBufferPrivateHelio setActive:%i\n", active);
+
+    m_mediaSource->sourceBufferPrivateActiveStateChanged(active);
 }
 
 void SourceBufferPrivateHelio::notifyClientWhenReadyForMoreSamples(AtomicString trackId) {
@@ -280,6 +523,10 @@ void SourceBufferPrivateHelio::notifyClientWhenReadyForMoreSamples(AtomicString 
     //     it.value = true;
     // }
 }
+
+// void SourceBufferPrivateHelio::setTrackDescription(PassRefPtr<MediaDescriptionHelio> descryption) {
+//     m_trackDescription = descryption;
+// }
 
 // void SourceBufferPrivateHelio::trackInfoEventHandler(const SourceBufferPrivateClient::InitializationSegment &segment) {
 //     printf("SourceBufferPrivateHelio trackInfoEventHandler\n");

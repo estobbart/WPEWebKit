@@ -9,15 +9,15 @@
 namespace WebCore {
 class AudioTrackPrivateHelio final : public AudioTrackPrivate {
 public:
-    static PassRefPtr<AudioTrackPrivateHelio> create(void *track) {
-        return adoptRef(new AudioTrackPrivateHelio(track));
+    static PassRefPtr<AudioTrackPrivateHelio> create(uint32_t id) {
+        return adoptRef(new AudioTrackPrivateHelio(id));
     }
     // The id of the AudioTrackPrivate is used by the SourceBuffer to
     // create a track buffer map that it can associate MediaSamples with.
     AtomicString id() const override { return m_id; }
 
 private:
-    AudioTrackPrivateHelio(void *track);
+    AudioTrackPrivateHelio(uint32_t id);
 
     AtomicString m_id;
 };

@@ -53,6 +53,25 @@ MediaPlayer::SupportsType MediaPlayerPrivateHelio::_supportsType(const MediaEngi
     if (parameters.type == "image/svg+xml"){
         return MediaPlayer::IsNotSupported;
     }
+
+/*
+
+MediaSource::isTypeSupported(video/mp4; codecs="avc1.4d4015")
+MediaPlayerPrivateHelio _supportsType:video/mp4 codec:avc1.4d4015 url: keySystem: channels:0 isMediaSource:1 isMediaStream:0
+
+MediaSource::isTypeSupported(video/mp4; codecs="avc1.4d401e")
+MediaPlayerPrivateHelio _supportsType:video/mp4 codec:avc1.4d401e url: keySystem: channels:0 isMediaSource:1 isMediaStream:0
+MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
+
+MediaSource::isTypeSupported(video/mp4; codecs="avc1.4d401f")
+MediaPlayerPrivateHelio _supportsType:video/mp4 codec:avc1.4d401f url: keySystem: channels:0 isMediaSource:1 isMediaStream:0
+MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
+
+MediaSource::isTypeSupported(audio/mp4; codecs="mp4a.40.5")
+MediaPlayerPrivateHelio _supportsType:audio/mp4 codec:mp4a.40.5 url: keySystem: channels:0 isMediaSource:1 isMediaStream:0
+MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
+
+*/
   printf("MediaPlayerPrivateHelio _supportsType:%s codec:%s url:%s keySystem:%s channels:%i isMediaSource:%i isMediaStream:%i\n",
       parameters.type.utf8().data(),
       parameters.codecs.utf8().data(),
@@ -62,23 +81,32 @@ MediaPlayer::SupportsType MediaPlayerPrivateHelio::_supportsType(const MediaEngi
       parameters.isMediaSource,
       parameters.isMediaStream);
 
-  if (!parameters.type.isEmpty()){//  && parameters.type == "video/mp2ts") { // TODO:
-      printf("MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported\n");
-      // TODO: If we get a codec we can guarentee support, else it's maybe
+  if (parameters.isMediaSource) {
+
+      // TODO: Check these..
+      if (!parameters.codecs.isEmpty()) {
+          printf("MediaPlayerPrivateHelio::MediaPlayer::IsSupported parameters.isMediaSource and codecs\n");
+          return MediaPlayer::IsSupported;
+      }
+
+      printf("MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource\n");
       return MediaPlayer::MayBeSupported;
   }
 
-  if (parameters.isMediaSource) {
-    printf("MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported\n");
-    return MediaPlayer::MayBeSupported;
+  // MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported !parameters.type.isEmpty()
+  if (!parameters.type.isEmpty()){//  && parameters.type == "video/mp2ts") { // TODO:
+      printf("MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported !parameters.type.isEmpty()\n");
+      // TODO: If we get a codec we can guarentee support, else it's maybe
+      return MediaPlayer::IsNotSupported;
   }
 
   printf("MediaPlayerPrivateHelio::MediaPlayer::IsNotSupported\n");
   return MediaPlayer::IsNotSupported;
 }
 
-MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player __attribute__((unused)))
-  : m_mediaSourcePrivate(0) {
+MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
+  : m_mediaPlayer(player)
+  , m_mediaSourcePrivate(0) {
     //m_helioEngine = helio_init();
     printf("MediaPlayerPrivateHelio constructor\n");
 }
@@ -173,13 +201,16 @@ void MediaPlayerPrivateHelio::paint(GraphicsContext& ctx __attribute__((unused))
     //printf("MediaPlayerPrivateHelio paint\n");
 }
 
-void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __attribute__((unused)))
-{
+void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __attribute__((unused))) {
 /*    if (state == m_networkState)
         return;
 
     m_networkState = state;
     m_player->networkStateChanged(); */
+}
+
+void MediaPlayerPrivateHelio::mediaSourcePrivateActiveSourceBuffersChanged() {
+  m_mediaPlayer->client().mediaPlayerActiveSourceBuffersChanged(m_mediaPlayer);
 }
 
 }

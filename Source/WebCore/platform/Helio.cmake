@@ -12,15 +12,15 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
         platform/graphics/helio/VideoTrackPrivateHelio.cpp
     )
 
-#    list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
-#        /home/estobb200/Development/RDK/rpi-yocto/libhelio/include
-#    )
+    list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
+        /home/estobb200/Development/RDK/Xi5/build-pacexi5/tmp/work/cortexa15t2hf-vfp-neon-rdk-linux-gnueabi/rcvmf/1.0-r0/git/isobmff/include/
+    )
 
 #    link_directories("/home/estobb200/Development/RDK/rpi-yocto/libhelio/build/lib" "${WEBKIT_LIBRARIES_LINK_DIR}") // doesn't work
 
-#    list(APPEND WebCore_LIBRARIES
-#        -L/home/estobb200/Development/RDK/rpi-yocto/libhelio/build/lib -lhelio
-#    )
+    list(APPEND WebCore_LIBRARIES
+        -L/home/estobb200/Development/RDK/Xi5/build-pacexi5/tmp/work/cortexa15t2hf-vfp-neon-rdk-linux-gnueabi/rcvmf/1.0-r0/git/isobmff/ -lisobmff
+    )
 
 #set(WebKit2_OUTPUT_NAME WPEWebKit)
 #set(WebKit2_WebProcess_OUTPUT_NAME WPEWebProcess)

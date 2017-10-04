@@ -152,8 +152,10 @@ bool UserInputBridge::handleMouseForceEvent(const PlatformMouseEvent& mouseEvent
     return m_page.mainFrame().eventHandler().handleMouseForceEvent(mouseEvent);
 }
 
+#if USE(GSTREAMER)
 // Implemented in MediaPlayerPrivateGStreamer.cpp
 void noticeEnterKeyDownEvent();
+#endif
 
 bool UserInputBridge::handleKeyEvent(const PlatformKeyboardEvent& keyEvent, InputSource inputSource)
 {
@@ -170,10 +172,12 @@ bool UserInputBridge::handleKeyEvent(const PlatformKeyboardEvent& keyEvent, Inpu
     UNUSED_PARAM(inputSource);
 #endif
 
+#if USE(GSTREAMER)
     if (keyEvent.type() == PlatformEvent::KeyDown && keyEvent.keyIdentifier() == "Enter")
     {
         noticeEnterKeyDownEvent();
     }
+#endif
 
     return m_page.focusController().focusedOrMainFrame().eventHandler().keyEvent(keyEvent);
 }

@@ -68,7 +68,9 @@ namespace WebCore {
 // During the video playback startup the web app usually initiates lots of resource loading.
 // We use load start/complete as a checkpoint to provide parsed startup media frames
 // to MSE source buffers and playback pipeline.
+#if USE(GSTREAMER)
 void flushActiveStartupBuffers();
+#endif
 
 ResourceLoadPriority CachedResource::defaultPriorityForResourceType(Type type)
 {
@@ -269,7 +271,9 @@ void CachedResource::load(CachedResourceLoader& cachedResourceLoader)
         m_fragmentIdentifierForRequest = String();
     }
 
+#if USE(GSTREAMER)
     flushActiveStartupBuffers();
+#endif
 
     m_loader = platformStrategies()->loaderStrategy()->loadResource(frame, *this, request, m_options);
     if (!m_loader) {
@@ -311,7 +315,9 @@ void CachedResource::checkNotify()
     if (isLoading() || stillNeedsLoad())
         return;
 
+#if USE(GSTREAMER)
     flushActiveStartupBuffers();
+#endif
 
     CachedResourceClientWalker<CachedResourceClient> walker(m_clients);
     while (CachedResourceClient* client = walker.next())
@@ -343,7 +349,7 @@ void CachedResource::error(CachedResource::Status status)
     setLoading(false);
     checkNotify();
 }
-    
+
 void CachedResource::cancelLoad()
 {
     if (!isLoading() && !stillNeedsLoad())
@@ -584,12 +590,12 @@ void CachedResource::setDecodedSize(unsigned size)
         MemoryCache::singleton().removeFromLRUList(*this);
 
     m_decodedSize = size;
-   
+
     if (allowsCaching() && inCache()) {
         auto& memoryCache = MemoryCache::singleton();
         // Now insert into the new LRU list.
         memoryCache.insertInLRUList(*this);
-        
+
         // Insert into or remove from the live decoded list if necessary.
         // When inserting into the LiveDecodedResourcesList it is possible
         // that the m_lastDecodedAccessTime is still zero or smaller than
@@ -632,7 +638,7 @@ void CachedResource::setEncodedSize(unsigned size)
 void CachedResource::didAccessDecodedData(double timeStamp)
 {
     m_lastDecodedAccessTime = timeStamp;
-    
+
     if (allowsCaching() && inCache()) {
         auto& memoryCache = MemoryCache::singleton();
         if (memoryCache.inLiveDecodedResourcesList(*this)) {
@@ -642,9 +648,9 @@ void CachedResource::didAccessDecodedData(double timeStamp)
         memoryCache.pruneSoon();
     }
 }
-    
-void CachedResource::setResourceToRevalidate(CachedResource* resource) 
-{ 
+
+void CachedResource::setResourceToRevalidate(CachedResource* resource)
+{
     ASSERT(resource);
     ASSERT(!m_resourceToRevalidate);
     ASSERT(resource != this);
@@ -658,7 +664,7 @@ void CachedResource::setResourceToRevalidate(CachedResource* resource)
     m_resourceToRevalidate = resource;
 }
 
-void CachedResource::clearResourceToRevalidate() 
+void CachedResource::clearResourceToRevalidate()
 {
     ASSERT(m_resourceToRevalidate);
     ASSERT(m_resourceToRevalidate->m_proxyResource == this);
@@ -673,7 +679,7 @@ void CachedResource::clearResourceToRevalidate()
     m_resourceToRevalidate = nullptr;
     deleteIfPossible();
 }
-    
+
 void CachedResource::switchClientsToRevalidatedResource()
 {
     ASSERT(m_resourceToRevalidate);
@@ -755,7 +761,7 @@ bool CachedResource::canUseCacheValidator() const
 }
 
 CachedResource::RevalidationDecision CachedResource::makeRevalidationDecision(CachePolicy cachePolicy) const
-{    
+{
     switch (cachePolicy) {
     case CachePolicyHistoryBuffer:
         return RevalidationDecision::No;
@@ -844,7 +850,7 @@ void CachedResource::tryReplaceEncodedData(SharedBuffer& newBuffer)
 {
     if (!m_data)
         return;
-    
+
     if (!mayTryReplaceEncodedData())
         return;
 

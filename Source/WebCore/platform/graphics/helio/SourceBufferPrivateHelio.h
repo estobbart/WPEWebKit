@@ -2,6 +2,11 @@
 #define SourceBufferPrivateHelio_h
 
 #include "SourceBufferPrivate.h"
+#include "MediaDescription.h"
+
+#include "rcvmf_isobmff.h"
+
+#include <wtf/WeakPtr.h>
 
 //#include "helio.h"
 //#include "demux/track.h"
@@ -11,8 +16,34 @@ namespace WebCore {
 
 class MediaSourcePrivateHelio;
 
+
+class MediaDescriptionHelio final : public MediaDescription {
+public:
+    static RefPtr<MediaDescriptionHelio> create(char *codec) { return adoptRef(new MediaDescriptionHelio(codec)); }
+    virtual ~MediaDescriptionHelio() { }
+
+    AtomicString codec() const override { return m_codec; }
+    bool isVideo() const override { return m_isVideo; }
+    bool isAudio() const override { return m_isAudio; }
+    bool isText() const override { return m_isText; }
+
+protected:
+    MediaDescriptionHelio(char *codec)
+        : m_isVideo(strcmp(codec, "avc1") == 0)
+        , m_isAudio(strcmp(codec, "mp4a") == 0)
+        , m_isText(0)
+        , m_codec(codec)
+        { }
+
+    AtomicString m_codec;
+    bool m_isVideo;
+    bool m_isAudio;
+    bool m_isText;
+};
+
 class SourceBufferPrivateHelio final : public SourceBufferPrivate {
 public:
+    // TODO: Pass the codec here..
     static RefPtr<SourceBufferPrivateHelio> create(MediaSourcePrivateHelio*);
     ~SourceBufferPrivateHelio();
 
@@ -60,15 +91,34 @@ public:
     //void mediaSampleEventHandler(helio_sample_t **samples);
 
     //void demuxCompleteEventHandler();
+    //void setTrackDescription(PassRefPtr<MediaDescriptionHelio>);
 
 private:
 
     explicit SourceBufferPrivateHelio(MediaSourcePrivateHelio*);
+
+    void didDetectISOBMFFHeader(rcv_node_t *root);
+
+    void didDetectISOBMFFSegment(rcv_node_t *root);
+
+    WeakPtr<SourceBufferPrivateHelio> createWeakPtr() { return m_weakFactory.createWeakPtr(); }
+
+    WeakPtrFactory<SourceBufferPrivateHelio> m_weakFactory;
+
     MediaPlayer::ReadyState m_readyState;
 
     SourceBufferPrivateClient* m_client;
     //helio_t *m_helio;
     //HashMap<AtomicString, bool> m_trackNotifyMap;
+    rcv_parser_t *m_rcvmfParser;
+    MediaSourcePrivateHelio *m_mediaSource;
+
+    // RefPtr<MediaDescriptionHelio> m_trackDescription;
+  
+    // Captured from the MVHD box when the init segment is appended,
+    // then provided to each MediaSample so that it can calculate it's
+    // duration, cts & dts.
+    uint32_t m_timescale;
 
 };
 }

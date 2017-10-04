@@ -27,6 +27,10 @@ public:
     void waitForSeekCompleted() override;
     void seekCompleted() override;
 
+    // When a SourceBuffer set's it's private impl (Helio) to active, it must report
+    // back to the MediaPlayer though the MediaSource.
+    void sourceBufferPrivateActiveStateChanged(bool isActive);
+
 private:
     MediaSourcePrivateHelio(MediaPlayerPrivateHelio*, MediaSourcePrivateClient*);
     // TODO: Weird that this isn't defined on the
@@ -37,6 +41,7 @@ private:
     MediaPlayer::ReadyState m_readyState;
 
     Vector<RefPtr<SourceBufferPrivateHelio>> m_sourceBuffers;
+    MediaPlayerPrivateHelio *m_mediaPlayer;
 };
 
 }

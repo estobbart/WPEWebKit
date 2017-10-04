@@ -10,14 +10,14 @@ namespace WebCore {
 
 class VideoTrackPrivateHelio final : public VideoTrackPrivate {
 public:
-    static PassRefPtr<VideoTrackPrivateHelio> create(void *track) {
-        return adoptRef(new VideoTrackPrivateHelio(track));
+    static PassRefPtr<VideoTrackPrivateHelio> create(uint32_t id) {
+        return adoptRef(new VideoTrackPrivateHelio(id));
     }
 
     AtomicString id() const override { return m_id; }
 
 private:
-    VideoTrackPrivateHelio(void *track);
+    VideoTrackPrivateHelio(uint32_t id);
 
     AtomicString m_id;
 

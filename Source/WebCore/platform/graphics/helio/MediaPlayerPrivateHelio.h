@@ -34,7 +34,8 @@
  * for that metadata. When it's done with the provided data it calls the clients
  * sourceBufferPrivateAppendComplete which causes the updatend event to fire.
  *
- *
+ * MediaPlayerHelio has a reference to the clock control component of the
+ * video engine.
  *
  */
 
@@ -86,6 +87,11 @@ public:
 
     void paint(GraphicsContext&, const FloatRect&) override;
 
+
+    // To be able to report buffer status back to the MediaPlayer->client()
+    // this method is exposed to the MediaSource can call it.
+    void mediaSourcePrivateActiveSourceBuffersChanged();
+
 protected:
     void setNetworkState(MediaPlayer::NetworkState);
 
@@ -95,6 +101,8 @@ private:
 
     RefPtr<MediaSourcePrivateHelio> m_mediaSourcePrivate;
     // helio_t *m_helioEngine;
+
+    MediaPlayer *m_mediaPlayer;
 
 };
 
