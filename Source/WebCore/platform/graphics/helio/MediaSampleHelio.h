@@ -23,7 +23,10 @@ public:
     }
 
 private:
-    MediaSampleHelio(rcv_node_t *root, uint32_t timescale) {
+    MediaSampleHelio(rcv_node_t *root, uint32_t timescale)
+      : m_presentationTime()
+      , m_decodeTime()
+      , m_duration() {
         m_sample = root;
         //m_id = AtomicString(String::format("%i", m_sample->track_id));
         // m_id = AtomicString::number(0);
@@ -42,6 +45,7 @@ private:
     }
 
     virtual ~MediaSampleHelio() {
+        printf("~MediaSampleHelio");
         rcv_destory_tree(&m_sample);
     }
 
@@ -54,10 +58,10 @@ private:
     }
 
     // TODO: TFHD is it's track ID, we shouldn't support set here.
+    // TODO: Why is this part of the interface?
     void setTrackID(const String& id) override {
-        printf("WARNING MediaSampleHelio::trackID %s NOT SUPPORTED", id.utf8().data());
+        printf("WARNING MediaSampleHelio::setTrackID %s NOT SUPPORTED", id.utf8().data());
         printf("... current id %s \n", m_id.string().utf8().data());
-        //m_id = id;
     }
 
     size_t sizeInBytes() const override;
@@ -67,13 +71,11 @@ private:
     void offsetTimestampsBy(const MediaTime&) override;
     // TODO: When is setTimestamps called??
     void setTimestamps(const MediaTime&, const MediaTime&) override;
-    // TODO: Support division of the MP4
     bool isDivisable() const override;
     std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> divide(const MediaTime& presentationTime) override;
     // TODO: What's a non-displaying copy for?
     Ref<MediaSample> createNonDisplayingCopy() const override;
 
-    // TODO: What's SampleFlasgs?
     SampleFlags flags() const override;
     // TODO: Define PlatformSample for Helio
     PlatformSample platformSample() override;
@@ -87,6 +89,10 @@ private:
     rcv_node_t *m_sample;
 
     uint32_t m_timescale;
+  
+    MediaTime m_presentationTime;
+    MediaTime m_decodeTime;
+    MediaTime m_duration;
 };
 
 }

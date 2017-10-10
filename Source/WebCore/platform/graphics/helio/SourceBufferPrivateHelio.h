@@ -119,6 +119,8 @@ private:
     // then provided to each MediaSample so that it can calculate it's
     // duration, cts & dts.
     uint32_t m_timescale;
+  
+    bool m_readyForMoreSamples;
 
 };
 }

@@ -50,7 +50,7 @@ void MediaPlayerPrivateHelio::_getSupportedTypes(HashSet<String, ASCIICaseInsens
  * It also gets called with "" when video.src is assigned.
  */
 MediaPlayer::SupportsType MediaPlayerPrivateHelio::_supportsType(const MediaEngineSupportParameters& parameters) {
-    if (parameters.type == "image/svg+xml"){
+    if (parameters.type == "image/svg+xml" || parameters.type == "application/xml"){
         return MediaPlayer::IsNotSupported;
     }
 

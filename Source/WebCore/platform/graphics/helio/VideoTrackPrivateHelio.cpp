@@ -6,9 +6,7 @@
 
 namespace WebCore {
 
-VideoTrackPrivateHelio::VideoTrackPrivateHelio(uint32_t id)
-{
-    //m_id = AtomicString(String::format("%i", track->id));
+VideoTrackPrivateHelio::VideoTrackPrivateHelio(uint32_t id) {
     m_id = AtomicString::number(id);
 }
 

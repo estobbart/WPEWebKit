@@ -12,46 +12,43 @@
 namespace WebCore {
 
 MediaTime MediaSampleHelio::presentationTime() const {
-    // printf("presentationTime\n");
-    rcv_node_t *box = rcv_node_child(m_sample, "trun");
-    if (box) {
-        rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
-        MediaTime _decodeTime = this->decodeTime();
-        double pts = rcv_trun_first_presentation_time(trun, _decodeTime.toDouble(), m_timescale);
-        //printf("m_timescale %u\n", m_timescale);
-        printf("PRESENTATION TIME:%f\n", pts);
-        return MediaTime::createWithDouble(pts);
+    if (!m_presentationTime) {
+        rcv_node_t *box = rcv_node_child(m_sample, "trun");
+        if (box) {
+            rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
+            MediaTime _decodeTime = this->decodeTime();
+            double pts = rcv_trun_first_presentation_time(trun, _decodeTime.toDouble(), m_timescale);
+            printf("PRESENTATION TIME:%f\n", pts);
+            m_presentationTime = MediaTime::createWithDouble(pts);
+        }
     }
-
-    // double rcv_trun_first_presentation_time(rcv_trun_box_t *trun, double decode_time, uint32_t timescale);
-    return MediaTime::createWithDouble(0);
-    //return toMediaTime(CMSampleBufferGetPresentationTimeStamp(m_sample.get()));
+    return m_presentationTime;
 }
 
 MediaTime MediaSampleHelio::decodeTime() const {
-    rcv_node_t *box = rcv_node_child(m_sample, "tfdt");
-    if (box) {
-        rcv_tfdt_box_t *tfdt = RCV_TFDT_BOX(rcv_node_raw(box));
-        double dts = rcv_tfdt_decode_time_seconds(tfdt, m_timescale);
-        //printf("m_timescale %u\n", m_timescale);
-        printf("DECODE TIME:%f\n", dts);
-        return MediaTime::createWithDouble(dts);
+    if (!m_decodeTime) {
+        rcv_node_t *box = rcv_node_child(m_sample, "tfdt");
+        if (box) {
+            rcv_tfdt_box_t *tfdt = RCV_TFDT_BOX(rcv_node_raw(box));
+            double dts = rcv_tfdt_decode_time_seconds(tfdt, m_timescale);
+            printf("DECODE TIME:%f\n", dts);
+            m_decodeTime = MediaTime::createWithDouble(dts);
+        }
     }
-    // printf("decodeTime\n");
-    return MediaTime::createWithDouble(0);
+    return m_decodeTime;
 }
 
 MediaTime MediaSampleHelio::duration() const {
-    // printf("duration\n");
-    rcv_node_t *box = rcv_node_child(m_sample, "trun");
-    if (box) {
-        rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
-        double duration = rcv_trun_duration(trun, m_timescale);
-        //printf("m_timescale %u\n", m_timescale);
-        printf("DURATION TIME:%f\n", duration);
-        return MediaTime::createWithDouble(duration);
+    if (!m_duration) {
+        rcv_node_t *box = rcv_node_child(m_sample, "trun");
+        if (box) {
+            rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
+            double duration = rcv_trun_duration(trun, m_timescale);
+            printf("DURATION TIME:%f\n", duration);
+            m_duration = MediaTime::createWithDouble(duration);
+        }
     }
-    return MediaTime::createWithDouble(0);
+    return m_duration;
 }
 
 size_t MediaSampleHelio::sizeInBytes() const {
@@ -66,12 +63,14 @@ size_t MediaSampleHelio::sizeInBytes() const {
 }
 
 FloatSize MediaSampleHelio::presentationSize() const {
-    // TODO: This is only in the init header
+    // TODO: This is only in the init header, would need the SourceBuffer
+    // to provide it in the constructor.
     printf("presentationSize\n");
     return FloatSize();
 }
 
 void MediaSampleHelio::offsetTimestampsBy(const MediaTime & mediaTime __attribute__((unused))) {
+  // TODO: We need to support this at some point.
   printf("offsetTimestampsBy\n");
 }
 
@@ -80,6 +79,9 @@ void MediaSampleHelio::setTimestamps(const MediaTime &mediaTimeOne __attribute__
   printf("setTimestamps\n");
 }
 
+// NOTE(estobb200): A sample would only be divisible if it had multiple
+// keyframes in it that could be used as RAPs. Since in S8 the keyframes are
+// only at the start of a sample it's not worth dividing them.
 bool MediaSampleHelio::isDivisable() const {
     printf("isDivisable\n");
     return false;
@@ -95,9 +97,10 @@ Ref<MediaSample> MediaSampleHelio::createNonDisplayingCopy() const {
     return MediaSampleHelio::create(NULL, 0);
 }
 
+// NOTE(estobb200): Every sample from super8 is considered a sync sample,
+// See comments about being divisible.
 MediaSample::SampleFlags MediaSampleHelio::flags() const {
     printf("flags\n");
-    // TODO: It's unclear what this IsSync means
     /*
     enum SampleFlags {
         None = 0,

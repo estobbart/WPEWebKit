@@ -7,6 +7,7 @@
 #if ENABLE(VIDEO_TRACK)
 
 namespace WebCore {
+  
 class AudioTrackPrivateHelio final : public AudioTrackPrivate {
 public:
     static PassRefPtr<AudioTrackPrivateHelio> create(uint32_t id) {
@@ -21,7 +22,6 @@ private:
 
     AtomicString m_id;
 };
-
 
 }
 
