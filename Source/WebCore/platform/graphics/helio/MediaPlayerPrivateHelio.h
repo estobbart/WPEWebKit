@@ -2,6 +2,7 @@
 #define MediaPlayerPrivateHelio_h
 
 #include "MediaPlayerPrivate.h"
+#include "rcvmf_media_pipeline.h"
 
 
 /**
@@ -88,9 +89,18 @@ public:
     void paint(GraphicsContext&, const FloatRect&) override;
 
 
+    // TODO: This object as a proxy, is a little ugly.. may make more sense to
+    // have the SourceBuffer call MediaPlayerPrivate methods directly.
+
     // To be able to report buffer status back to the MediaPlayer->client()
     // this method is exposed to the MediaSource can call it.
     void mediaSourcePrivateActiveSourceBuffersChanged();
+  
+    // This proxies from the MediaSourcePrivate which receives the first
+    // durationChanged call, through this object to the MediaPlayer
+    void durationChanged();
+    
+    rcv_media_clock_controller_t * platformClockController();
 
 protected:
     void setNetworkState(MediaPlayer::NetworkState);
@@ -103,6 +113,7 @@ private:
     // helio_t *m_helioEngine;
 
     MediaPlayer *m_mediaPlayer;
+    rcv_media_clock_controller_t *m_platformClockController;
 
 };
 

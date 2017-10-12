@@ -23,8 +23,11 @@ RefPtr<MediaSourcePrivateHelio> MediaSourcePrivateHelio::create(MediaPlayerPriva
 
 MediaSourcePrivateHelio::MediaSourcePrivateHelio(MediaPlayerPrivateHelio* helioPlayer, MediaSourcePrivateClient*)
   : m_mediaPlayer(helioPlayer)
+    // TODO: IS this the right ready state?
   , m_readyState(MediaPlayer::HaveNothing) {
     printf("MediaSourcePrivateHelio constructor\n");
+      
+   m_mediaPlatform = rcv_media_platform_init();
 }
 
 MediaSourcePrivateHelio::~MediaSourcePrivateHelio() {
@@ -44,6 +47,7 @@ MediaSourcePrivate::AddStatus MediaSourcePrivateHelio::addSourceBuffer(const Con
 // H.264 Main: avc1.4D40xx, where xx is the AVC level
 // H.264 High: avc1.6400xx, where xx is the AVC level
 
+  String firstCodec = contentType.codecs().first();
   printf("MediaSourcePrivateHelio addSourceBuffer contentType:%s\n", contentType.type().utf8().data());
   // TODO: Would mean exposing _supportsType from MediaPlayerPrivateHelio
   // Doesn't really make much sense to check again here unless we got the codec
@@ -63,8 +67,8 @@ MediaSourcePrivate::AddStatus MediaSourcePrivateHelio::addSourceBuffer(const Con
   // }
 
   // TODO: We know the content type here.. so we should pass that along.
-  m_sourceBuffers.append(SourceBufferPrivateHelio::create(this));
-  sourceBufferPrivate = m_sourceBuffers.last();
+  sourceBufferPrivate = SourceBufferPrivateHelio::create(m_mediaPlayer, this, firstCodec);
+  m_sourceBuffers.add(sourceBufferPrivate, NULL);
 
   return MediaSourcePrivate::Ok;
 }
@@ -78,6 +82,7 @@ void MediaSourcePrivateHelio::removeSourceBuffer(SourceBufferPrivate* sourceBuff
  */
 void MediaSourcePrivateHelio::durationChanged() {
     printf("MediaSourcePrivateHelio durationChanged\n");
+    m_mediaPlayer->durationChanged();
 }
 
 /**
@@ -114,9 +119,44 @@ void MediaSourcePrivateHelio::seekCompleted() {
     printf("MediaSourcePrivateHelio seekCompleted\n");
 }
 
-void MediaSourcePrivateHelio::sourceBufferPrivateActiveStateChanged(bool isActive __attribute__((unused))){
+void MediaSourcePrivateHelio::sourceBufferPrivateActiveStateChanged(SourceBufferPrivateHelio *sourceBuffer,
+                                                                    rcv_media_pipeline_t *mediaPipeline) {
     printf("MediaSourcePrivateHelio sourceBufferPrivateActiveStateChanged\n");
+    
+    m_sourceBuffers.set(sourceBuffer, mediaPipeline);
+    
+    bool allCreatedAreActive = true;
+    rcv_media_pipeline_t **activePipelines = malloc(sizeof(rcv_media_pipeline_t *) * m_sourceBuffers.size());
+    // TODO: need to enumerate with an index
+    
+    uint8_t idx = 0;
+    for (rcv_media_pipeline_t *pipeline : m_sourceBuffers.values()) {
+        if (!pipeline) {
+            allCreatedAreActive = false;
+            break;
+        }
+        activePipelines[idx++] = pipeline;
+    }
+
+    activePipelines[m_sourceBuffers.size()] = NULL;
+    
+    if (allCreatedAreActive) {
+        rcv_media_platform_connect_pipelines(m_mediaPlatform, activePipelines);
+        printf("MediaSourcePrivateHelio .. rcv_media_platform_connect_pipelines\n");
+        for (auto sourceBuffer : m_sourceBuffers.keys()) {
+            sourceBuffer->startStream();
+        }
+        printf("MediaSourcePrivateHelio .. startStream DONE\n");
+
+    }
+
+
+    free(activePipelines);
     m_mediaPlayer->mediaSourcePrivateActiveSourceBuffersChanged();
+}
+
+rcv_media_platform_t * MediaSourcePrivateHelio::mediaPlatform() {
+    return m_mediaPlatform;
 }
 
 }

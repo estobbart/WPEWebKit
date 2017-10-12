@@ -3,12 +3,6 @@
 
 #import <wtf/PrintStream.h>
 
-/**
- * presentationTime
- * decodeTime
- * duration
- */
-
 namespace WebCore {
 
 MediaTime MediaSampleHelio::presentationTime() const {
@@ -81,7 +75,9 @@ void MediaSampleHelio::setTimestamps(const MediaTime &mediaTimeOne __attribute__
 
 // NOTE(estobb200): A sample would only be divisible if it had multiple
 // keyframes in it that could be used as RAPs. Since in S8 the keyframes are
-// only at the start of a sample it's not worth dividing them.
+// only at the start of a sample it's not worth dividing them. We do need to
+// support an iframe track, and in that case would get multiple keyframes in
+// a sample. But it still TDB if it's worth dividing them.
 bool MediaSampleHelio::isDivisable() const {
     printf("isDivisable\n");
     return false;

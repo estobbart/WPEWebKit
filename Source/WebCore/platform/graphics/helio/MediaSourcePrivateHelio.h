@@ -2,6 +2,7 @@
 #define MediaSourceHelioPrivate_h
 
 #include "MediaSourcePrivate.h"
+#include "rcvmf_media_pipeline.h"
 
 namespace WebCore {
 
@@ -29,7 +30,10 @@ public:
 
     // When a SourceBuffer set's it's private impl (Helio) to active, it must report
     // back to the MediaPlayer though the MediaSource.
-    void sourceBufferPrivateActiveStateChanged(bool isActive);
+    void sourceBufferPrivateActiveStateChanged(SourceBufferPrivateHelio*,
+                                               rcv_media_pipeline_t *);
+    
+    rcv_media_platform_t * mediaPlatform();
 
 private:
     MediaSourcePrivateHelio(MediaPlayerPrivateHelio*, MediaSourcePrivateClient*);
@@ -40,8 +44,10 @@ private:
 
     MediaPlayer::ReadyState m_readyState;
 
-    Vector<RefPtr<SourceBufferPrivateHelio>> m_sourceBuffers;
+    HashMap<RefPtr<SourceBufferPrivateHelio>, rcv_media_pipeline_t *> m_sourceBuffers;
+
     MediaPlayerPrivateHelio *m_mediaPlayer;
+    rcv_media_platform_t *m_mediaPlatform;
 };
 
 }

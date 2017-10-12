@@ -13,13 +13,17 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
     )
 
     list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
-        /home/estobb200/Development/RDK/Xi5/build-pacexi5/tmp/work/cortexa15t2hf-vfp-neon-rdk-linux-gnueabi/rcvmf/1.0-r0/git/isobmff/include/
+        /home/estobb200/Development/RDK/librcvmf/isobmff/include/
+        /home/estobb200/Development/RDK/librcvmf/engine/include/
     )
 
 #    link_directories("/home/estobb200/Development/RDK/rpi-yocto/libhelio/build/lib" "${WEBKIT_LIBRARIES_LINK_DIR}") // doesn't work
 
     list(APPEND WebCore_LIBRARIES
-        -L/home/estobb200/Development/RDK/Xi5/build-pacexi5/tmp/work/cortexa15t2hf-vfp-neon-rdk-linux-gnueabi/rcvmf/1.0-r0/git/isobmff/ -lisobmff
+        -lnexus_static
+        -lnxclient
+        -L/home/estobb200/Development/RDK/Xi5/build-pacexi5/tmp/work/cortexa15t2hf-vfp-neon-rdk-linux-gnueabi/rcvmf/1.0-r0/rcvmf-1.0/isobmff/ -lisobmff
+        -L/home/estobb200/Development/RDK/Xi5/build-pacexi5/tmp/work/cortexa15t2hf-vfp-neon-rdk-linux-gnueabi/rcvmf/1.0-r0/rcvmf-1.0/engine/ -lrcvmf
     )
 
 #set(WebKit2_OUTPUT_NAME WPEWebKit)

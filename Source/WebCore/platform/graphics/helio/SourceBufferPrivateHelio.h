@@ -5,6 +5,7 @@
 #include "MediaDescription.h"
 
 #include "rcvmf_isobmff.h"
+#include "rcvmf_media_pipeline.h"
 
 #include <wtf/WeakPtr.h>
 
@@ -14,8 +15,8 @@
 
 namespace WebCore {
 
+class MediaPlayerPrivateHelio;
 class MediaSourcePrivateHelio;
-
 
 class MediaDescriptionHelio final : public MediaDescription {
 public:
@@ -33,7 +34,11 @@ protected:
         , m_isAudio(strcmp(codec, "mp4a") == 0)
         , m_isText(0)
         , m_codec(codec)
-        { }
+        {
+            if (!m_isAudio && !m_isVideo) {
+                printf("ERROR creating MediaDescriptionHelio from %s \n", codec);
+            }
+        }
 
     AtomicString m_codec;
     bool m_isVideo;
@@ -43,8 +48,11 @@ protected:
 
 class SourceBufferPrivateHelio final : public SourceBufferPrivate {
 public:
-    // TODO: Pass the codec here..
-    static RefPtr<SourceBufferPrivateHelio> create(MediaSourcePrivateHelio*);
+    // TODO: Pass the expected mimetype/codec here..
+    // currently we just write codec.
+    static RefPtr<SourceBufferPrivateHelio> create(MediaPlayerPrivateHelio *,
+                                                   MediaSourcePrivateHelio *,
+                                                   String);
     ~SourceBufferPrivateHelio();
 
     void setClient(SourceBufferPrivateClient*) override;
@@ -54,7 +62,7 @@ public:
     void resetParserState() override;
     void removedFromMediaSource() override;
 
-    //     enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
+    // enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
     MediaPlayer::ReadyState readyState() const override;
     void setReadyState(MediaPlayer::ReadyState) override;
 
@@ -84,22 +92,20 @@ public:
     // Called by the SourceBuffer during provideMediaData after
     // it checks if we're ready for more samples, and we return false.
     void notifyClientWhenReadyForMoreSamples(AtomicString) override;
-
-    // TODO: Is there a better way to hide these?
-    //void trackInfoEventHandler(const SourceBufferPrivateClient::InitializationSegment& segment);
-
-    //void mediaSampleEventHandler(helio_sample_t **samples);
-
-    //void demuxCompleteEventHandler();
-    //void setTrackDescription(PassRefPtr<MediaDescriptionHelio>);
+    
+    // Called by the MediaSource once all the created buffer's become active.
+    void startStream();
 
 private:
 
-    explicit SourceBufferPrivateHelio(MediaSourcePrivateHelio*);
+    explicit SourceBufferPrivateHelio(MediaPlayerPrivateHelio *,
+                                      MediaSourcePrivateHelio *,
+                                      String);
 
-    void didDetectISOBMFFHeader(rcv_node_t *root);
-
-    void didDetectISOBMFFSegment(rcv_node_t *root);
+    // During an append cycle, these methods would be called when
+    bool didDetectISOBMFFInitSegment(rcv_node_t *root);
+    
+    bool didDetectISOBMFFMediaSegment(rcv_node_t *root);
 
     WeakPtr<SourceBufferPrivateHelio> createWeakPtr() { return m_weakFactory.createWeakPtr(); }
 
@@ -108,19 +114,25 @@ private:
     MediaPlayer::ReadyState m_readyState;
 
     SourceBufferPrivateClient* m_client;
-    //helio_t *m_helio;
-    //HashMap<AtomicString, bool> m_trackNotifyMap;
+
     rcv_parser_t *m_rcvmfParser;
+    MediaPlayerPrivateHelio *m_mediaPlayer;
     MediaSourcePrivateHelio *m_mediaSource;
 
-    // RefPtr<MediaDescriptionHelio> m_trackDescription;
+    RefPtr<MediaDescriptionHelio> m_trackDescription;
   
     // Captured from the MVHD box when the init segment is appended,
     // then provided to each MediaSample so that it can calculate it's
     // duration, cts & dts.
     uint32_t m_timescale;
   
-    bool m_readyForMoreSamples;
+    //bool m_needsSamplesNotification;
+    
+    // m_mediaStream is data in to be processed
+    rcv_media_stream_t *m_mediaStream;
+    // m_mediaPipeline is decoder resources and read off the m_mediaStream
+    // and get synchronized using the clock.
+    rcv_media_pipeline_t *m_mediaPipeline;
 
 };
 }

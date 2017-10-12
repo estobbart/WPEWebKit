@@ -105,10 +105,9 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
 }
 
 MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
-  : m_mediaPlayer(player)
-  , m_mediaSourcePrivate(0) {
-    //m_helioEngine = helio_init();
-    printf("MediaPlayerPrivateHelio constructor\n");
+    : m_mediaPlayer(player)
+    , m_mediaSourcePrivate(0) {
+        printf("MediaPlayerPrivateHelio constructor\n");
 }
 
 MediaPlayerPrivateHelio::~MediaPlayerPrivateHelio() {
@@ -122,6 +121,8 @@ void MediaPlayerPrivateHelio::load(const String& url) {
 void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* client) {
     printf("MediaPlayerPrivateHelio load url:%s, client\n", url.utf8().data());
     m_mediaSourcePrivate = MediaSourcePrivateHelio::create(this, client);
+    
+    m_platformClockController = rcv_media_stream_clock_init();
 }
 
 void MediaPlayerPrivateHelio::cancelLoad() {
@@ -211,6 +212,14 @@ void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __
 
 void MediaPlayerPrivateHelio::mediaSourcePrivateActiveSourceBuffersChanged() {
   m_mediaPlayer->client().mediaPlayerActiveSourceBuffersChanged(m_mediaPlayer);
+}
+  
+void MediaPlayerPrivateHelio::durationChanged() {
+  m_mediaPlayer->durationChanged();
+}
+
+rcv_media_clock_controller_t * MediaPlayerPrivateHelio::platformClockController() {
+    return m_platformClockController;
 }
 
 }
