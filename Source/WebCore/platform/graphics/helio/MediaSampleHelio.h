@@ -21,6 +21,9 @@ public:
     static Ref<MediaSampleHelio> create(rcv_node_t *root, uint32_t timescale) {
         return adoptRef(*new MediaSampleHelio(root, timescale));
     }
+    
+    void sampleBuffer(uint8_t **buffer, size_t *size);
+    void * box(char * fourcc);
 
 private:
     MediaSampleHelio(rcv_node_t *root, uint32_t timescale)
@@ -41,11 +44,11 @@ private:
         }
 
         m_timescale = timescale;
-        //printf("MediaSampleHelio m_timescale %u timescale %u\n", m_timescale, timescale);
+        printf("MediaSampleHelio m_timescale %u\n", m_timescale);
     }
 
     virtual ~MediaSampleHelio() {
-        printf("~MediaSampleHelio");
+        printf("~MediaSampleHelio\n");
         rcv_destory_tree(&m_sample);
     }
 

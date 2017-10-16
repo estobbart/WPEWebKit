@@ -7,6 +7,7 @@
 #include "AudioTrackPrivateHelio.h"
 #include "MediaSourcePrivateHelio.h"
 #include "MediaPlayerPrivateHelio.h"
+#include "avc.h"
 //#include "InbandTextTrackPrivate.h"
 
 
@@ -62,11 +63,10 @@ namespace WebCore {
 //     // printf("_mvex_box_callback");
 // }
     
-static size_t rcv_media_read_callback_source_buffer(void *context __attribute__((unused)),
-                                                    void *buffer __attribute__((unused)),
-                                                    size_t buffer_size) {
-    printf("SourceBufferPrivateHelio READ TO WRITE: %zu \n", buffer_size);
-    return 0;
+static void rcv_media_read_callback_source_buffer(void *context) {
+    printf("SourceBufferPrivateHelio rcv_media_read_callback_source_buffer\n");
+    SourceBufferPrivateHelio *sb = (SourceBufferPrivateHelio *)context;
+    sb->platformBufferAvailable();
 }
 
 
@@ -83,7 +83,10 @@ SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaPlayerPrivateHelio *play
   : m_readyState(MediaPlayer::HaveNothing)
   , m_weakFactory(this)
   , m_mediaPlayer(player)
-  , m_mediaSource(parent) {
+  , m_mediaSource(parent)
+  , m_writeBufferAvailable(false)
+  , m_isAudio(false)
+  , m_isVideo(false) {
       printf("SourceBufferPrivateHelio constructor: %s\n", codec.utf8().data());
       // TODO: Fix this in helio..
       //   static const hve_event_callback_t callbacks[] = {
@@ -253,11 +256,24 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
         // TODO: Change this to... sample->type == avc1
         //                         sample->type == mp4a
         box = rcv_node_child(root, "stsd");
-        box = rcv_node_first_child(box);
+        if (box) {
+            printf("Found STSD box\n");
+        } else {
+            printf("ERROR FINDING STSD box\n");
+        }
         
-        char *s = rcv_node_type(box);
+//        if (rcv_stsd_sample_entry_type(RCV_STSD_BOX(box))) {
+//            m_trackDescription = MediaDescriptionHelio::create(rcv_stsd_sample_entry_type(RCV_STSD_BOX(box)));
+//        } else {
         
-        m_trackDescription = MediaDescriptionHelio::create(strcmp(s, "avcC") == 0 ? "avc1" : "mp4a");
+//            printf("SourceBufferPrivateHelio:: rcv_stsd_sample_entry_type%s\n",
+//                   rcv_stsd_sample_entry_type(RCV_STSD_BOX(box)));
+            box = rcv_node_first_child(box);
+            
+            char *s = rcv_node_type(box);
+            
+            m_trackDescription = MediaDescriptionHelio::create(strcmp(s, "avcC") == 0 ? "avc1" : "mp4a");
+//        }
         
         rcv_node_t *child_box = rcv_node_child(root, "hdlr");
         if (child_box) {
@@ -269,6 +285,32 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
             printf("rcv_stsd_sample_entry_type... %s\n", format);
             
             if (strcmp(format, "vide") == 0) {
+                rcv_node_t *avcC_node = rcv_node_child(root, "avcC");
+                rcv_avcC_box_t *avcC = RCV_AVCC_BOX(rcv_node_raw(avcC_node));
+
+                rcv_cursor_t *sps_cursor = rcv_cursor_init();
+                rcv_avcC_parameter_set_t *param_set = rcv_avcC_sps_next(avcC, &sps_cursor);
+                rcv_avcC_parameter_set_assign_and_free(&param_set, &sps_nal, &sps_len);
+                if (sps_cursor != NULL) {
+                    printf("ERROR sps_cursor not freed\n");
+                }
+                if (param_set != NULL) {
+                    printf("ERROR param_set not freed\n");
+                }
+                
+                rcv_cursor_t *pps_cursor = rcv_cursor_init();
+                param_set = rcv_avcC_pps_next(avcC, &pps_cursor);
+                rcv_avcC_parameter_set_assign_and_free(&param_set, &pps_nal, &pps_len);
+                if (pps_cursor != NULL) {
+                    printf("ERROR sps_cursor not freed\n");
+                }
+                if (param_set != NULL) {
+                    printf("ERROR param_set not freed\n");
+                }
+                
+                
+                
+                m_isVideo = true;
                 SourceBufferPrivateClient::InitializationSegment::VideoTrackInformation vtInfo;
                 vtInfo.track = VideoTrackPrivateHelio::create(id);
                 vtInfo.description = m_trackDescription;
@@ -276,6 +318,7 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
                 
                 segment.videoTracks.append(vtInfo);
             } else if (strcmp(format, "soun") == 0) {
+                m_isAudio = true;
                 SourceBufferPrivateClient::InitializationSegment::AudioTrackInformation atInfo;
                 atInfo.track = AudioTrackPrivateHelio::create(id);
                 atInfo.description = m_trackDescription;
@@ -331,10 +374,97 @@ void SourceBufferPrivateHelio::setReadyState(MediaPlayer::ReadyState readyState)
 void SourceBufferPrivateHelio::flush(AtomicString as) {
     printf("SourceBufferPrivateHelio flush:%s\n", as.string().utf8().data());
 }
-
-void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample>, AtomicString as) {
+    
+void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample, AtomicString as) {
     printf("SourceBufferPrivateHelio enqueueSample:%s\n", as.string().utf8().data());
-    //TODO: Write data
+    m_writeBufferAvailable = false;
+    //size_t rcv_media_pipeline_write(rcv_media_pipeline_t *rcv_media_stream, void *buffer, size_t buffer_size);
+
+    uint8_t *buffer;
+    size_t size;
+
+    printf("SourceBufferPrivateHelio static_cast<MediaSampleHelio *>\n");
+    MediaSampleHelio* helioSample = static_cast<MediaSampleHelio *>(mediaSample.get());
+    printf("SourceBufferPrivateHelio helioSample->sampleBuffer(&buffer, &size);\n");
+    helioSample->sampleBuffer(&buffer, &size);
+
+
+    printf("SourceBufferPrivateHelio helioSample->sampleBuffer DONE\n");
+    
+    if (m_isVideo) {
+        printf("SourceBufferPrivateHelio isVideo\n");
+        //typedef uint32_t (*nalu_sample_size_next)(void *ctx);
+        
+        //typedef bool (*nalu_key_frame_headers_next)(void *ctx, uint8_t **nal_unit, uint16_t *length);
+        
+        // TODO: Might be easier to just pass the avcC config here..
+
+        rcv_trun_box_t *trun = RCV_TRUN_BOX(helioSample->box("trun"));
+        printf("SourceBufferPrivateHelio RCV_TRUN_BOX(helioSample->box('trun'))\n");
+        
+        rcv_nal_param_t **sps = (rcv_nal_param_t **)malloc(sizeof(rcv_nal_param_t *) * 2);
+        sps[0] = malloc(sizeof(rcv_nal_param_t));
+        sps[0]->nal_unit = sps_nal;
+        sps[0]->nal_len = sps_len;
+        sps[1] = malloc(sizeof(rcv_nal_param_t));
+        sps[1]->nal_unit = NULL;
+        sps[1]->nal_len = 0;
+        printf("SourceBufferPrivateHelio rcv_nal_param_t **sps\n");
+        
+        rcv_nal_param_t **pps = (rcv_nal_param_t **)malloc(sizeof(rcv_nal_param_t *) * 2);
+        pps[0] = malloc(sizeof(rcv_nal_param_t));
+        pps[0]->nal_unit = pps_nal;
+        pps[0]->nal_len = pps_len;
+        pps[1] = malloc(sizeof(rcv_nal_param_t));
+        pps[1]->nal_unit = NULL;
+        pps[1]->nal_len = 0;
+        printf("SourceBufferPrivateHelio rcv_nal_param_t **pps\n");
+        
+        rcv_param_sets_t param_sets = { sps, pps };
+        
+        rcv_cursor_t *cursor = rcv_cursor_init();
+        
+        typedef struct _sample_ctx_t {
+            rcv_trun_box_t *trun;
+            rcv_cursor_t *cursor;
+        } sample_ctx_t;
+        
+        sample_ctx_t sample_ctx = { trun, cursor };
+        
+        auto sample_size_iterator = [](void *ctx) -> uint32_t {
+            sample_ctx_t *sample_ctx = (sample_ctx_t *)ctx;
+            rcv_trun_box_t *trun = RCV_TRUN_BOX(sample_ctx->trun);
+            rcv_cursor_t *cursor = sample_ctx->cursor;
+            if (cursor) {
+                printf("SourceBufferPrivateHelio::rcv_trun_sample_size_next OK\n");
+                return rcv_trun_sample_size_next(trun, &cursor);
+            }
+            printf("ERROR SourceBufferPrivateHelio::rcv_trun_sample_size_next\n");
+            return 0;
+        };
+
+        printf("SourceBufferPrivateHelio avc_to_annex_b\n");
+        avc_to_annex_b(&param_sets, sample_size_iterator, &sample_ctx,
+                       rcv_trun_sample_count(trun), 3,
+                       &buffer, &size);
+        printf("SourceBufferPrivateHelio avc_to_annex_b DONE\n");
+        free(sps[0]);
+        free(sps[1]);
+        free(sps);
+        free(pps[0]);
+        free(pps[1]);
+        free(pps);
+        printf("SourceBufferPrivateHelio FREEING... DONE\n");
+    }
+
+    printf("SourceBufferPrivateHelio WILL rcv_media_stream_write\n");
+    size_t write = rcv_media_stream_write(m_mediaStream, buffer, size);
+    if (write != size) {
+        printf("ERROR SourceBufferPrivateHelio -> rcv_media_pipeline_write");
+    } else {
+        printf("SourceBufferPrivateHelio WRITE SUCCESS\n");
+    }
+    
 }
 
 // SourceBuffer calls this method twice before calling the notify method.
@@ -345,7 +475,7 @@ bool SourceBufferPrivateHelio::isReadyForMoreSamples(AtomicString as) {
     printf("SourceBufferPrivateHelio isReadyForMoreSamples TRACK:%s \n",
            as.string().utf8().data());
 
-    return false;
+    return m_writeBufferAvailable;
 }
 
 void SourceBufferPrivateHelio::setActive(bool active) {
@@ -375,9 +505,16 @@ void SourceBufferPrivateHelio::notifyClientWhenReadyForMoreSamples(AtomicString 
 // Called by the MediaSource as soon as all it's buffers become active
 // and the pipelines are connected.
 void SourceBufferPrivateHelio::startStream() {
+    printf("SourceBufferPrivateHelio::startStream()\n");
     // TODO: at this point we MAY be ready for samples, but we wait until
     // the stream's data ready callback occurs.
     rcv_media_pipeline_start_stream(m_mediaPipeline, m_mediaStream);
+}
+
+// callback from rcvmf
+void SourceBufferPrivateHelio::platformBufferAvailable() {
+    printf("SourceBufferPrivateHelio::platformBufferAvailable()\n");
+    m_writeBufferAvailable = true;
 }
 
 }

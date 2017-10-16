@@ -95,6 +95,9 @@ public:
     
     // Called by the MediaSource once all the created buffer's become active.
     void startStream();
+    
+    // callback from rcvmf
+    void platformBufferAvailable();
 
 private:
 
@@ -126,13 +129,23 @@ private:
     // duration, cts & dts.
     uint32_t m_timescale;
   
-    //bool m_needsSamplesNotification;
+    bool m_writeBufferAvailable;
     
     // m_mediaStream is data in to be processed
     rcv_media_stream_t *m_mediaStream;
     // m_mediaPipeline is decoder resources and read off the m_mediaStream
     // and get synchronized using the clock.
     rcv_media_pipeline_t *m_mediaPipeline;
+    
+    bool m_isAudio;
+    bool m_isVideo;
+    
+    // TODO: This needs to be somewhere else...
+    uint8_t *sps_nal;
+    uint16_t sps_len;
+    
+    uint8_t *pps_nal;
+    uint16_t pps_len;
 
 };
 }

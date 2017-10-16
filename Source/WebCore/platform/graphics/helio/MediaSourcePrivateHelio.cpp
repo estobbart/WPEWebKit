@@ -124,11 +124,11 @@ void MediaSourcePrivateHelio::sourceBufferPrivateActiveStateChanged(SourceBuffer
     printf("MediaSourcePrivateHelio sourceBufferPrivateActiveStateChanged\n");
     
     m_sourceBuffers.set(sourceBuffer, mediaPipeline);
-    
+
+    // TODO: This can take up ~100ms, especially when calling startStream
     bool allCreatedAreActive = true;
     rcv_media_pipeline_t **activePipelines = malloc(sizeof(rcv_media_pipeline_t *) * m_sourceBuffers.size());
-    // TODO: need to enumerate with an index
-    
+
     uint8_t idx = 0;
     for (rcv_media_pipeline_t *pipeline : m_sourceBuffers.values()) {
         if (!pipeline) {
@@ -141,6 +141,9 @@ void MediaSourcePrivateHelio::sourceBufferPrivateActiveStateChanged(SourceBuffer
     activePipelines[m_sourceBuffers.size()] = NULL;
     
     if (allCreatedAreActive) {
+        
+        // callOnMainThread...
+        
         rcv_media_platform_connect_pipelines(m_mediaPlatform, activePipelines);
         printf("MediaSourcePrivateHelio .. rcv_media_platform_connect_pipelines\n");
         for (auto sourceBuffer : m_sourceBuffers.keys()) {

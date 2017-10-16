@@ -116,5 +116,24 @@ void MediaSampleHelio::dump(PrintStream &ps __attribute__((unused))) const {
     // out.print("{PTS(", presentationTime(), "), DTS(", decodeTime(), "), duration(", duration(), "), flags(", (int)flags(), "), presentationSize(", presentationSize().width(), "x", presentationSize().height(), ")}");
     printf("dump\n");
 }
+    
+void MediaSampleHelio::sampleBuffer(uint8_t **buffer, size_t *size) {
+    rcv_node_t *node = rcv_node_child(m_sample, "mdat");
+    if (node) {
+        rcv_mdat_box_t *mdat = RCV_MDAT_BOX(rcv_node_raw(node));
+        *buffer = rcv_mdat_data(mdat);
+        *size = rcv_mdat_data_size(mdat);
+        printf("sampleBuffer ----> :%zu \n", *size);
+    }
+    //rcv_node_buffer(m_sample, buffer, size);
+}
+    
+void * MediaSampleHelio::box(char * fourcc) {
+    rcv_node_t *node = rcv_node_child(m_sample, fourcc);
+    if (node) {
+        return rcv_node_raw(node);
+    }
+    return NULL;
+}
 
 }
