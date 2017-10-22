@@ -4,6 +4,7 @@
 
 #include "MediaPlayerPrivateHelio.h"
 #include "MediaSourcePrivateHelio.h"
+#include "MediaSourcePrivateClient.h"
 #include <wtf/NeverDestroyed.h>
 #include <stdio.h>
 //#include "helio.h"
@@ -105,7 +106,9 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
 }
 
 MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
-    : m_mediaPlayer(player)
+    : m_mediaSourceClient()
+    , m_readyState(MediaPlayer::HaveNothing)
+    , m_mediaPlayer(player)
     , m_mediaSourcePrivate(0) {
         printf("MediaPlayerPrivateHelio constructor\n");
 }
@@ -120,7 +123,8 @@ void MediaPlayerPrivateHelio::load(const String& url) {
 
 void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* client) {
     printf("MediaPlayerPrivateHelio load url:%s, client\n", url.utf8().data());
-    m_mediaSourcePrivate = MediaSourcePrivateHelio::create(this, client);
+    m_mediaSourceClient = client;
+    m_mediaSourcePrivate = MediaSourcePrivateHelio::create(this, m_mediaSourceClient);
     
     m_platformClockController = rcv_media_stream_clock_init();
 }
@@ -138,7 +142,8 @@ void MediaPlayerPrivateHelio::pause() {
 }
 
 FloatSize MediaPlayerPrivateHelio::naturalSize() const {
-    printf("MediaPlayerPrivateHelio naturalSize\n");
+    // TOOD: This happens a lot after HaveMetadata is reported..
+    //printf("MediaPlayerPrivateHelio naturalSize\n");
     return FloatSize(0 /* width */, 0 /* height */);
 }
 
@@ -154,6 +159,20 @@ bool MediaPlayerPrivateHelio::hasAudio() const {
 
 void MediaPlayerPrivateHelio::setVisible(bool visible __attribute__((unused))) {
     //printf("MediaPlayerPrivateHelio setVisible:%i\n", visible);
+}
+    
+MediaTime MediaPlayerPrivateHelio::durationMediaTime() const {
+    printf("MediaPlayerPrivateHelio durationMediaTime\n");
+    return m_mediaSourceClient->duration();
+}
+
+float MediaPlayerPrivateHelio::currentTime() const {
+    printf("MediaPlayerPrivateHelio currentTime\n");
+    return 0;
+}
+
+void MediaPlayerPrivateHelio::seekDouble(double time) {
+    printf("MediaPlayerPrivateHelio seekDouble %f \n", time);
 }
 
 bool MediaPlayerPrivateHelio::seeking() const {
@@ -172,10 +191,11 @@ MediaPlayer::NetworkState MediaPlayerPrivateHelio::networkState() const {
     return MediaPlayer::Empty;
 }
 
+// https://www.w3.org/TR/2011/WD-html5-20110405/video.html#the-ready-states
 MediaPlayer::ReadyState MediaPlayerPrivateHelio::readyState() const {
     printf("MediaPlayerPrivateHelio readyState\n");
     // enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
-    return MediaPlayer::HaveNothing;
+    return m_readyState;
 }
 
 std::unique_ptr<PlatformTimeRanges> MediaPlayerPrivateHelio::buffered() const {
@@ -187,6 +207,8 @@ std::unique_ptr<PlatformTimeRanges> MediaPlayerPrivateHelio::buffered() const {
     return timeRanges;
 }
 
+// TODO: It looks like this occurs and then dispatches the networkState change
+// progress event. Check if setting this flag to false changes that event.
 bool MediaPlayerPrivateHelio::didLoadingProgress() const {
     // TODO: Does this determine when "open" dispatches?
     // printf("MediaPlayerPrivateHelio didLoadingProgress\n");
@@ -210,9 +232,16 @@ void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __
     m_player->networkStateChanged(); */
 }
 
+/**
+ * a SourceBufferPrivate becomes active after having reported their initSegment
+ * back the SourceBuffer. We use active SourceBuffers to trigger that we have
+ * metadata.
+ *
+ * TODO: This may eventually mean we removed a source buffer also..
+ */
 void MediaPlayerPrivateHelio::mediaSourcePrivateActiveSourceBuffersChanged() {
-  m_mediaPlayer->client().mediaPlayerActiveSourceBuffersChanged(m_mediaPlayer);
-}
+    m_mediaPlayer->client().mediaPlayerActiveSourceBuffersChanged(m_mediaPlayer);
+    setReadyState(MediaPlayer::HaveMetadata);}
   
 void MediaPlayerPrivateHelio::durationChanged() {
   m_mediaPlayer->durationChanged();
@@ -220,6 +249,14 @@ void MediaPlayerPrivateHelio::durationChanged() {
 
 rcv_media_clock_controller_t * MediaPlayerPrivateHelio::platformClockController() {
     return m_platformClockController;
+}
+
+void MediaPlayerPrivateHelio::setReadyState(MediaPlayer::ReadyState stateChange) {
+    if (stateChange == MediaPlayer::HaveMetadata && m_readyState < stateChange) {
+        m_readyState = stateChange;
+    }
+    
+    m_mediaPlayer->readyStateChanged();
 }
 
 }

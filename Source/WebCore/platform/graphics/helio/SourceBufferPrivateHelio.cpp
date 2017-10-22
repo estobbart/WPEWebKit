@@ -375,6 +375,23 @@ void SourceBufferPrivateHelio::flush(AtomicString as) {
     printf("SourceBufferPrivateHelio flush:%s\n", as.string().utf8().data());
 }
     
+void hex_dump_buffer(uint8_t *buffer, size_t size) {
+    uint8_t count = 0;
+    while (size) {
+        printf(" %02x", buffer[0]);
+        size--;
+        buffer++;
+        count++;
+        if (count == 16) {
+            printf("\n");
+            count = 0;
+        }
+    }
+    if (count) {
+        printf("\n");
+    }
+}
+    
 void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample, AtomicString as) {
     printf("SourceBufferPrivateHelio enqueueSample:%s\n", as.string().utf8().data());
     m_writeBufferAvailable = false;
@@ -391,6 +408,7 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
 
     printf("SourceBufferPrivateHelio helioSample->sampleBuffer DONE\n");
     
+    uint32_t first_sample_size = 0;
     if (m_isVideo) {
         printf("SourceBufferPrivateHelio isVideo\n");
         //typedef uint32_t (*nalu_sample_size_next)(void *ctx);
@@ -427,9 +445,10 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
         typedef struct _sample_ctx_t {
             rcv_trun_box_t *trun;
             rcv_cursor_t *cursor;
+            uint32_t one_sample;
         } sample_ctx_t;
         
-        sample_ctx_t sample_ctx = { trun, cursor };
+        sample_ctx_t sample_ctx = { trun, cursor, 0 };
         
         auto sample_size_iterator = [](void *ctx) -> uint32_t {
             sample_ctx_t *sample_ctx = (sample_ctx_t *)ctx;
@@ -437,7 +456,11 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
             rcv_cursor_t *cursor = sample_ctx->cursor;
             if (cursor) {
                 printf("SourceBufferPrivateHelio::rcv_trun_sample_size_next OK\n");
-                return rcv_trun_sample_size_next(trun, &cursor);
+                uint32_t sample_size = rcv_trun_sample_size_next(trun, &cursor);
+                if (sample_ctx->one_sample == 0) {
+                    sample_ctx->one_sample = sample_size;
+                }
+                return sample_size;
             }
             printf("ERROR SourceBufferPrivateHelio::rcv_trun_sample_size_next\n");
             return 0;
@@ -455,9 +478,15 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
         free(pps[1]);
         free(pps);
         printf("SourceBufferPrivateHelio FREEING... DONE\n");
+        first_sample_size = sample_ctx.one_sample;
     }
 
     printf("SourceBufferPrivateHelio WILL rcv_media_stream_write\n");
+    
+    if (m_isVideo) {
+        hex_dump_buffer(buffer, first_sample_size + pps_len + sps_len + 4);
+    }
+    
     size_t write = rcv_media_stream_write(m_mediaStream, buffer, size);
     if (write != size) {
         printf("ERROR SourceBufferPrivateHelio -> rcv_media_pipeline_write");

@@ -72,7 +72,23 @@ public:
     bool hasAudio() const override;
 
     void setVisible(bool) override;
+    
+    /**
+     * Duration is stored in the MediaSourcePrivateClient
+     */
+    MediaTime durationMediaTime() const;
 
+    // TODO: We may want to support these as doubles
+    virtual float currentTime() const;
+    
+    /**
+     * Not required to override, but seeking is nice..
+     */
+    //virtual void seek(float) { }
+    void seekDouble(double time); // { seek(time); }
+    void seek(const MediaTime& time) { seekDouble(time.toDouble()); }
+    void seekWithTolerance(const MediaTime& time, const MediaTime&, const MediaTime&) { seek(time); }
+    
     bool seeking() const override;
 
     bool paused() const override;
@@ -106,6 +122,16 @@ protected:
     void setNetworkState(MediaPlayer::NetworkState);
 
 private:
+    
+    void setReadyState(MediaPlayer::ReadyState);
+    
+    MediaSourcePrivateClient* m_mediaSourceClient;
+    
+    MediaPlayer::NetworkState m_networkState; // TODO: This seems like it's managed
+    // at a higher level.
+
+    MediaPlayer::ReadyState m_readyState;
+
     static void _getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& types);
     static MediaPlayer::SupportsType _supportsType(const MediaEngineSupportParameters&);
 

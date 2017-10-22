@@ -22,6 +22,15 @@ public:
     void markEndOfStream(EndOfStreamStatus) override;
     void unmarkEndOfStream() override;
 
+    /*
+     W3C defines this as..
+     https://www.w3.org/TR/media-source/#dom-readystate
+     enum ReadyState {
+     "closed",
+     "open",
+     "ended"
+     };
+     */
     MediaPlayer::ReadyState readyState() const override;
     void setReadyState(MediaPlayer::ReadyState) override;
 

@@ -101,6 +101,7 @@ void MediaSourcePrivateHelio::unmarkEndOfStream() {
  * Indicates the current state of the MediaSource object. When the MediaSource
  * is created readyState must be set to "closed".
  */
+// 
 MediaPlayer::ReadyState MediaSourcePrivateHelio::readyState() const {
     printf("MediaSourcePrivateHelio readyState\n");
     return m_readyState;

@@ -105,7 +105,7 @@ private:
                                       MediaSourcePrivateHelio *,
                                       String);
 
-    // During an append cycle, these methods would be called when
+    // During an append cycle, these methods would be called
     bool didDetectISOBMFFInitSegment(rcv_node_t *root);
     
     bool didDetectISOBMFFMediaSegment(rcv_node_t *root);
