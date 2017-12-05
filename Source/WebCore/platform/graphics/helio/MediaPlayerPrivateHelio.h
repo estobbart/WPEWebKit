@@ -4,6 +4,13 @@
 #include "MediaPlayerPrivate.h"
 #include "rcvmf_media_pipeline.h"
 
+#include "PlatformLayer.h"
+
+//#if USE(TEXTURE_MAPPER)
+//#include "TextureMapperPlatformLayer.h"
+#include "TextureMapperPlatformLayerProxy.h"
+//#endif
+
 
 /**
  * The MediaPlayerPrivateHelio gets registered in platform/graphics/MediaPlayer.cpp
@@ -45,7 +52,11 @@ namespace WebCore {
 
 class MediaSourcePrivateHelio;
 
-class MediaPlayerPrivateHelio final : public MediaPlayerPrivateInterface {
+class MediaPlayerPrivateHelio final : public MediaPlayerPrivateInterface 
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    , public PlatformLayer
+#endif
+{
 public:
     explicit MediaPlayerPrivateHelio(MediaPlayer*);
     virtual ~MediaPlayerPrivateHelio();
@@ -95,8 +106,9 @@ public:
 
     MediaPlayer::NetworkState networkState() const override;
     MediaPlayer::ReadyState readyState() const override;
-
-    std::unique_ptr<PlatformTimeRanges> buffered() const override;
+ 
+    // Looks like this only gets used when calculating memory cost in MediaPlayerPrivate.h
+    std::unique_ptr<PlatformTimeRanges> buffered() const override { return m_mediaPlayer->buffered(); }
 
     bool didLoadingProgress() const override;
 
@@ -104,6 +116,10 @@ public:
 
     void paint(GraphicsContext&, const FloatRect&) override;
 
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    PlatformLayer* platformLayer() const override { return const_cast<MediaPlayerPrivateHelio*>(this); }
+    bool supportsAcceleratedRendering() const override { return false; }
+#endif
 
     // TODO: This object as a proxy, is a little ugly.. may make more sense to
     // have the SourceBuffer call MediaPlayerPrivate methods directly.
@@ -132,6 +148,8 @@ private:
 
     MediaPlayer::ReadyState m_readyState;
 
+    uint8_t m_rate;
+
     static void _getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& types);
     static MediaPlayer::SupportsType _supportsType(const MediaEngineSupportParameters&);
 
@@ -140,6 +158,14 @@ private:
 
     MediaPlayer *m_mediaPlayer;
     rcv_media_clock_controller_t *m_platformClockController;
+    
+    IntSize m_size;
+#if USE(COORDINATED_GRAPHICS_THREADED)
+    RefPtr<TextureMapperPlatformLayerProxy> proxy() const override { return m_platformLayerProxy.copyRef(); }
+    void swapBuffersIfNeeded() override { };
+    void pushTextureToCompositor();
+    RefPtr<TextureMapperPlatformLayerProxy> m_platformLayerProxy;
+#endif
 
 };
 

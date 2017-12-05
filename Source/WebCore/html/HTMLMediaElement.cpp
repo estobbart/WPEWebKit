@@ -218,7 +218,7 @@ static String actionName(HTMLMediaElementEnums::DelayedActionType action)
 #ifndef LOG_MEDIA_EVENTS
 // Default to not logging events because so many are generated they can overwhelm the rest of 
 // the logging.
-#define LOG_MEDIA_EVENTS 0
+#define LOG_MEDIA_EVENTS 1
 #endif
 
 #ifndef LOG_CACHED_TIME_WARNINGS
@@ -412,7 +412,7 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
     , m_playbackControlsManagerBehaviorRestrictionsTimer(*this, &HTMLMediaElement::playbackControlsManagerBehaviorRestrictionsTimerFired)
     , m_seekToPlaybackPositionEndedTimer(*this, &HTMLMediaElement::seekToPlaybackPositionEndedTimerFired)
     , m_asyncEventQueue(*this)
-    , m_lastTimeUpdateEventMovieTime(MediaTime::positiveInfiniteTime())
+    , m_lastTimeUpdateEventMovieTime(MediaTime::invalidTime())
     , m_firstTimePlaying(true)
     , m_playing(false)
     , m_isWaitingUntilMediaCanStart(false)
@@ -915,6 +915,7 @@ void HTMLMediaElement::didRecalcStyle(Style::Change)
 void HTMLMediaElement::scheduleDelayedAction(DelayedActionType actionType)
 {
     LOG(Media, "HTMLMediaElement::scheduleDelayedAction(%p) - setting %s flag", this, actionName(actionType).utf8().data());
+    LOG(Media, "HTMLMediaElement::scheduleDelayedAction(%p) - %i", this, actionType);
 
     if ((actionType & LoadMediaResource) && !(m_pendingActionFlags & LoadMediaResource)) {
         prepareForLoad();
@@ -967,6 +968,12 @@ void HTMLMediaElement::scheduleEvent(const AtomicString& eventName)
     // Don't set the event target, the event queue will set it in GenericEventQueue::timerFired and setting it here
     // will trigger an ASSERT if this element has been marked for deletion.
 
+#if LOG_MEDIA_EVENTS
+    if (m_asyncEventQueue.hasPendingEvents()) {
+        LOG(Media, "HTMLMediaElement::scheduleEvent(%p) - m_asyncEventQueue.hasPendingEvents() ... resuming.", this);
+        m_asyncEventQueue.resume();
+    }
+#endif
     m_asyncEventQueue.enqueueEvent(WTFMove(event));
 }
 
@@ -3606,16 +3613,20 @@ void HTMLMediaElement::scheduleTimeupdateEvent(bool periodicEvent)
     double timedelta = now - m_clockTimeAtLastUpdateEvent;
 
     // throttle the periodic events
-    if (periodicEvent && timedelta < maxTimeupdateEventFrequency)
+    if (periodicEvent && timedelta < maxTimeupdateEventFrequency) {
+        LOG(Media, "HTMLMediaElement::scheduleTimeupdateEvent(%p) - %i %i", this, periodicEvent, timedelta < maxTimeupdateEventFrequency); 
         return;
+    }
 
     // Some media engines make multiple "time changed" callbacks at the same time, but we only want one
     // event at a given time so filter here
     MediaTime movieTime = currentMediaTime();
-    if (movieTime != m_lastTimeUpdateEventMovieTime) {
+    if (!m_lastTimeUpdateEventMovieTime.isValid() || movieTime != m_lastTimeUpdateEventMovieTime) {
         scheduleEvent(eventNames().timeupdateEvent);
         m_clockTimeAtLastUpdateEvent = now;
         m_lastTimeUpdateEventMovieTime = movieTime;
+    } else {
+        LOG(Media, "HTMLMediaElement::scheduleTimeupdateEvent(%p) - %i", this, movieTime == m_lastTimeUpdateEventMovieTime);
     }
 }
 
@@ -4870,14 +4881,22 @@ Ref<TimeRanges> HTMLMediaElement::seekable() const
 
 bool HTMLMediaElement::potentiallyPlaying() const
 {
-    if (isBlockedOnMediaController())
+    if (isBlockedOnMediaController()) {
+        LOG(Media, "HTMLMediaElement::potentiallyPlaying isBlockedOnMediaController");
         return false;
+    }
     
-    if (!couldPlayIfEnoughData())
+    if (!couldPlayIfEnoughData()) {
+        LOG(Media, "HTMLMediaElement::potentiallyPlaying couldPlayIfEnoughData");
         return false;
+    }
 
-    if (m_readyState >= HAVE_FUTURE_DATA)
+    if (m_readyState >= HAVE_FUTURE_DATA) {
+        LOG(Media, "HTMLMediaElement::potentiallyPlaying m_readyState >= HAVE_FUTURE_DATA");
         return true;
+    }
+
+    LOG(Media, "m_readyStateMaximum >= HAVE_FUTURE_DATA && m_readyState < HAVE_FUTURE_DATA");
 
     return m_readyStateMaximum >= HAVE_FUTURE_DATA && m_readyState < HAVE_FUTURE_DATA;
 }

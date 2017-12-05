@@ -17,6 +17,7 @@ namespace WebCore {
 
 class MediaPlayerPrivateHelio;
 class MediaSourcePrivateHelio;
+class MediaSampleHelio;
 
 class MediaDescriptionHelio final : public MediaDescription {
 public:
@@ -146,6 +147,12 @@ private:
     
     uint8_t *pps_nal;
     uint16_t pps_len;
+    
+    // When an enqueued sample doesn't fit
+    // in a buffer, it get's captured finishes
+    // processing once additional space frees up.
+    MediaSampleHelio* m_enqueuedSample;
+    rcv_cursor_t *m_enqueuedSampleCursor;
 
 };
 }

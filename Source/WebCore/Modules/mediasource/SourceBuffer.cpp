@@ -2004,12 +2004,13 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
         // FIXME(135867): Make this gap detection logic less arbitrary.
         MediaTime oneSecond(1, 1);
         if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond) {
-            printf("trackBuffer.lastEnqueuedDecodeEndTime.isValid() == %i && sample->decodeTime(%f) - trackBuffer.lastEnqueuedDecodeEndTime(%f) > oneSecond == %i\n",
+            printf("ERROR:ignoring... trackID:%s  trackBuffer.lastEnqueuedDecodeEndTime.isValid() == %i && sample->decodeTime(%f) - trackBuffer.lastEnqueuedDecodeEndTime(%f) > oneSecond == %i\n",
+                   trackID.string().utf8().data(),
                    trackBuffer.lastEnqueuedDecodeEndTime.isValid(),
                    sample->decodeTime().toFloat(),
                    trackBuffer.lastEnqueuedDecodeEndTime.toFloat(),
                    sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond);
-            break;
+            //break;
         }
 
         trackBuffer.lastEnqueuedPresentationTime = sample->presentationTime();

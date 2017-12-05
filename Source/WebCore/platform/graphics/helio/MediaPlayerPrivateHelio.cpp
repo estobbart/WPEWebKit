@@ -9,7 +9,32 @@
 #include <stdio.h>
 //#include "helio.h"
 
+//#if USE(TEXTURE_MAPPER_GL)
+//#include "BitmapTextureGL.h"
+//#include "BitmapTexturePool.h"
+#include "TextureMapperGL.h"
+//#endif
+#if USE(COORDINATED_GRAPHICS_THREADED)
+#include "TextureMapperPlatformLayerBuffer.h"
+#endif
+
+// Period timeupdate dispatcher
+#include <pthread.h>
+//#include <unistd.h>
+
 namespace WebCore {
+
+pthread_t time_update_thread_id;
+
+
+static void *timeupdate_monitor(void *mediaPlayer) {
+   while(true) {
+       printf("timeupdate_thread sleep 0.250\n");
+       //m_mediaPlayer->timeChanged();
+       static_cast<MediaPlayer*>(mediaPlayer)->timeChanged();
+       WTF::sleep(0.250);
+   }
+}
 
 /**
  * Called from MediaPlayer based on #defines
@@ -32,6 +57,7 @@ void MediaPlayerPrivateHelio::_getSupportedTypes(HashSet<String, ASCIICaseInsens
 
     if (!isInitialized) {
         isInitialized = true;
+        // TODO: Get this from the librcvmf engine
         // helio_enumerate_supported_mime_types(&cache, [](void *cache, const char *mime_type){
         //     cache->get().add(ASCIILiteral(mime_type));
         // });
@@ -95,7 +121,7 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
   }
 
   // MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported !parameters.type.isEmpty()
-  if (!parameters.type.isEmpty()){//  && parameters.type == "video/mp2ts") { // TODO:
+  if (!parameters.type.isEmpty()) {//  && parameters.type == "video/mp2ts") { // TODO:
       printf("MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported !parameters.type.isEmpty()\n");
       // TODO: If we get a codec we can guarentee support, else it's maybe
       return MediaPlayer::IsNotSupported;
@@ -107,10 +133,21 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
 
 MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
     : m_mediaSourceClient()
+    , m_rate(0)
     , m_readyState(MediaPlayer::HaveNothing)
     , m_mediaPlayer(player)
     , m_mediaSourcePrivate(0) {
         printf("MediaPlayerPrivateHelio constructor\n");
+#if USE(COORDINATED_GRAPHICS_THREADED)
+        m_platformLayerProxy = adoptRef(new TextureMapperPlatformLayerProxy());
+#endif
+        
+//#if USE(USE_HOLE_PUNCH_EXTERNAL)
+#if USE(COORDINATED_GRAPHICS_THREADED)
+        LockHolder locker(m_platformLayerProxy->lock());
+        m_platformLayerProxy->pushNextBuffer(std::make_unique<TextureMapperPlatformLayerBuffer>(0, m_size, TextureMapperGL::ShouldOverwriteRect, GraphicsContext3D::DONT_CARE));
+#endif
+//#endif
 }
 
 MediaPlayerPrivateHelio::~MediaPlayerPrivateHelio() {
@@ -127,6 +164,8 @@ void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* 
     m_mediaSourcePrivate = MediaSourcePrivateHelio::create(this, m_mediaSourceClient);
     
     m_platformClockController = rcv_media_stream_clock_init();
+
+    pthread_create(&time_update_thread_id, NULL, timeupdate_monitor, m_mediaPlayer);
 }
 
 void MediaPlayerPrivateHelio::cancelLoad() {
@@ -135,30 +174,32 @@ void MediaPlayerPrivateHelio::cancelLoad() {
 
 void MediaPlayerPrivateHelio::play() {
     printf("MediaPlayerPrivateHelio play\n");
+    m_rate = 1;
 }
 
 void MediaPlayerPrivateHelio::pause() {
     printf("MediaPlayerPrivateHelio pause\n");
+    m_rate = 0;
 }
 
 FloatSize MediaPlayerPrivateHelio::naturalSize() const {
     // TOOD: This happens a lot after HaveMetadata is reported..
-    //printf("MediaPlayerPrivateHelio naturalSize\n");
-    return FloatSize(0 /* width */, 0 /* height */);
+    printf("MediaPlayerPrivateHelio naturalSize 1280x720: TODO: hardcoded\n");
+    return FloatSize(1280 /* width */, 720 /* height */);
 }
 
 bool MediaPlayerPrivateHelio::hasVideo() const {
-    printf("MediaPlayerPrivateHelio hasVideo\n");
-    return false;
+    printf("MediaPlayerPrivateHelio hasVideo %i\n", m_readyState >= MediaPlayer::HaveMetadata);
+    return m_readyState >= MediaPlayer::HaveMetadata;
 }
 
 bool MediaPlayerPrivateHelio::hasAudio() const {
-    printf("MediaPlayerPrivateHelio hasAudio\n");
-    return false;
+    printf("MediaPlayerPrivateHelio hasAudio %i\n", m_readyState >= MediaPlayer::HaveMetadata);
+    return m_readyState >= MediaPlayer::HaveMetadata;
 }
 
-void MediaPlayerPrivateHelio::setVisible(bool visible __attribute__((unused))) {
-    //printf("MediaPlayerPrivateHelio setVisible:%i\n", visible);
+void MediaPlayerPrivateHelio::setVisible(bool visible) {
+    printf("WARN MediaPlayerPrivateHelio setVisible:%i ignored\n", visible);
 }
     
 MediaTime MediaPlayerPrivateHelio::durationMediaTime() const {
@@ -167,28 +208,39 @@ MediaTime MediaPlayerPrivateHelio::durationMediaTime() const {
 }
 
 float MediaPlayerPrivateHelio::currentTime() const {
-    printf("MediaPlayerPrivateHelio currentTime\n");
-    return 0;
+    printf("MediaPlayerPrivateHelio currentTime... ");
+    rcv_media_platform_t *platform =  m_mediaSourcePrivate->mediaPlatform();
+    if (!platform) {
+       printf("NULL\n");
+       return 0;
+    }
+    float currentTime = rcv_media_platform_last_pts(platform) / 90000.0;
+    printf("%f\n", currentTime);
+    return currentTime;
 }
 
 void MediaPlayerPrivateHelio::seekDouble(double time) {
     printf("MediaPlayerPrivateHelio seekDouble %f \n", time);
+    // Notifying the timeChange dismisses that the player is in a seeking state
+    setReadyState(MediaPlayer::HaveFutureData);
+    // State must be > HaveFutureData to be able to dismiss the seeking??
+    m_mediaPlayer->timeChanged();
 }
 
 bool MediaPlayerPrivateHelio::seeking() const {
-    printf("MediaPlayerPrivateHelio seeking\n");
+    printf("MediaPlayerPrivateHelio seeking false\n");
     return false;
 }
 
 bool MediaPlayerPrivateHelio::paused() const {
-    printf("MediaPlayerPrivateHelio paused\n");
-    return false;
+    printf("MediaPlayerPrivateHelio paused %u\n", m_rate);
+    return m_rate == 0;
 }
 
 MediaPlayer::NetworkState MediaPlayerPrivateHelio::networkState() const {
-    printf("MediaPlayerPrivateHelio networkState\n");
+    printf("WARN MediaPlayerPrivateHelio networkState may be empty!!!\n");
     // enum NetworkState { Empty, Idle, Loading, Loaded, FormatError, NetworkError, DecodeError };
-    return MediaPlayer::Empty;
+    return m_readyState >= MediaPlayer::HaveMetadata ? MediaPlayer::Loaded : MediaPlayer::Empty;
 }
 
 // https://www.w3.org/TR/2011/WD-html5-20110405/video.html#the-ready-states
@@ -196,15 +248,6 @@ MediaPlayer::ReadyState MediaPlayerPrivateHelio::readyState() const {
     printf("MediaPlayerPrivateHelio readyState\n");
     // enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
     return m_readyState;
-}
-
-std::unique_ptr<PlatformTimeRanges> MediaPlayerPrivateHelio::buffered() const {
-    printf("MediaPlayerPrivateHelio buffered\n");
-    auto timeRanges = std::make_unique<PlatformTimeRanges>();
-    MediaTime rangeStart = MediaTime::zeroTime();
-    MediaTime rangeEnd = MediaTime::zeroTime();
-    timeRanges->add(rangeStart, rangeEnd);
-    return timeRanges;
 }
 
 // TODO: It looks like this occurs and then dispatches the networkState change
@@ -216,12 +259,14 @@ bool MediaPlayerPrivateHelio::didLoadingProgress() const {
     return true;
 }
 
-void MediaPlayerPrivateHelio::setSize(const IntSize& size __attribute__((unused))) {
-    //printf("MediaPlayerPrivateHelio setSize\n");
+void MediaPlayerPrivateHelio::setSize(const IntSize& size) {
+    printf("MediaPlayerPrivateHelio setSize\n");
+    m_size = size;
 }
 
-void MediaPlayerPrivateHelio::paint(GraphicsContext& ctx __attribute__((unused)), const FloatRect& rect __attribute__((unused))) {
-    //printf("MediaPlayerPrivateHelio paint\n");
+void MediaPlayerPrivateHelio::paint(GraphicsContext& ctx, const FloatRect& rect) {
+    printf("MediaPlayerPrivateHelio paint\n");
+    ctx.clearRect(rect);
 }
 
 void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __attribute__((unused))) {
@@ -230,6 +275,7 @@ void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __
 
     m_networkState = state;
     m_player->networkStateChanged(); */
+    printf("ERROR: MediaPlayerPrivateHelio::setNetworkState not being captured!!!\n");
 }
 
 /**
@@ -241,7 +287,10 @@ void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __
  */
 void MediaPlayerPrivateHelio::mediaSourcePrivateActiveSourceBuffersChanged() {
     m_mediaPlayer->client().mediaPlayerActiveSourceBuffersChanged(m_mediaPlayer);
-    setReadyState(MediaPlayer::HaveMetadata);}
+    setReadyState(MediaPlayer::HaveMetadata);
+    // TODO: Fix this and point it somewhere more appropriate..
+    m_mediaPlayer->networkStateChanged();
+}
   
 void MediaPlayerPrivateHelio::durationChanged() {
   m_mediaPlayer->durationChanged();
@@ -252,9 +301,11 @@ rcv_media_clock_controller_t * MediaPlayerPrivateHelio::platformClockController(
 }
 
 void MediaPlayerPrivateHelio::setReadyState(MediaPlayer::ReadyState stateChange) {
-    if (stateChange == MediaPlayer::HaveMetadata && m_readyState < stateChange) {
-        m_readyState = stateChange;
-    }
+    // Need to print this and keep track of if anyone else is calling it..
+    //if (stateChange == MediaPlayer::HaveMetadata && m_readyState < stateChange) {
+    //    m_readyState = stateChange;
+    //}
+    m_readyState = stateChange;
     
     m_mediaPlayer->readyStateChanged();
 }
