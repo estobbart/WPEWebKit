@@ -29,8 +29,7 @@ pthread_t time_update_thread_id;
 
 static void *timeupdate_monitor(void *mediaPlayer) {
    while(true) {
-       printf("timeupdate_thread sleep 0.250\n");
-       //m_mediaPlayer->timeChanged();
+       // printf("timeupdate_thread sleep 0.250\n");
        static_cast<MediaPlayer*>(mediaPlayer)->timeChanged();
        WTF::sleep(0.250);
    }
@@ -184,39 +183,39 @@ void MediaPlayerPrivateHelio::pause() {
 
 FloatSize MediaPlayerPrivateHelio::naturalSize() const {
     // TOOD: This happens a lot after HaveMetadata is reported..
-    printf("MediaPlayerPrivateHelio naturalSize 1280x720: TODO: hardcoded\n");
+    //printf("MediaPlayerPrivateHelio naturalSize 1280x720: TODO: hardcoded\n");
     return FloatSize(1280 /* width */, 720 /* height */);
 }
 
+// TODO: Need something better here
 bool MediaPlayerPrivateHelio::hasVideo() const {
-    printf("MediaPlayerPrivateHelio hasVideo %i\n", m_readyState >= MediaPlayer::HaveMetadata);
+    //printf("MediaPlayerPrivateHelio hasVideo %i\n", m_readyState >= MediaPlayer::HaveMetadata);
     return m_readyState >= MediaPlayer::HaveMetadata;
 }
 
+// TODO: Need something better here
 bool MediaPlayerPrivateHelio::hasAudio() const {
-    printf("MediaPlayerPrivateHelio hasAudio %i\n", m_readyState >= MediaPlayer::HaveMetadata);
+    //printf("MediaPlayerPrivateHelio hasAudio %i\n", m_readyState >= MediaPlayer::HaveMetadata);
     return m_readyState >= MediaPlayer::HaveMetadata;
 }
 
+// TODO: What does visible mean to us here?
 void MediaPlayerPrivateHelio::setVisible(bool visible) {
-    printf("WARN MediaPlayerPrivateHelio setVisible:%i ignored\n", visible);
+    //printf("WARN MediaPlayerPrivateHelio setVisible:%i ignored\n", visible);
 }
     
 MediaTime MediaPlayerPrivateHelio::durationMediaTime() const {
-    printf("MediaPlayerPrivateHelio durationMediaTime\n");
+    //printf("MediaPlayerPrivateHelio durationMediaTime\n");
     return m_mediaSourceClient->duration();
 }
 
 float MediaPlayerPrivateHelio::currentTime() const {
-    printf("MediaPlayerPrivateHelio currentTime... ");
     rcv_media_platform_t *platform =  m_mediaSourcePrivate->mediaPlatform();
     if (!platform) {
-       printf("NULL\n");
+       printf("MediaPlayerPrivateHelio::currentTime() NULL\n");
        return 0;
     }
-    float currentTime = rcv_media_platform_last_pts(platform) / 90000.0;
-    printf("%f\n", currentTime);
-    return currentTime;
+    return rcv_media_platform_last_pts(platform) / 90000.0;
 }
 
 void MediaPlayerPrivateHelio::seekDouble(double time) {
@@ -233,7 +232,7 @@ bool MediaPlayerPrivateHelio::seeking() const {
 }
 
 bool MediaPlayerPrivateHelio::paused() const {
-    printf("MediaPlayerPrivateHelio paused %u\n", m_rate);
+    //printf("MediaPlayerPrivateHelio paused() m_rate == %u\n", m_rate);
     return m_rate == 0;
 }
 
@@ -260,7 +259,7 @@ bool MediaPlayerPrivateHelio::didLoadingProgress() const {
 }
 
 void MediaPlayerPrivateHelio::setSize(const IntSize& size) {
-    printf("MediaPlayerPrivateHelio setSize\n");
+    //printf("MediaPlayerPrivateHelio setSize\n");
     m_size = size;
 }
 

@@ -18,6 +18,7 @@ namespace WebCore {
 class MediaPlayerPrivateHelio;
 class MediaSourcePrivateHelio;
 class MediaSampleHelio;
+class HelioCodecConfiguration;
 
 class MediaDescriptionHelio final : public MediaDescription {
 public:
@@ -140,19 +141,25 @@ private:
     
     bool m_isAudio;
     bool m_isVideo;
+
+    // TODO: Do we need to keep this?
+    rcv_node_t *m_isobmffInitSegmentRoot;
     
-    // TODO: This needs to be somewhere else...
-    uint8_t *sps_nal;
-    uint16_t sps_len;
-    
-    uint8_t *pps_nal;
-    uint16_t pps_len;
-    
+    RefPtr<HelioCodecConfiguration> m_codecConfiguration;
     // When an enqueued sample doesn't fit
     // in a buffer, it get's captured finishes
     // processing once additional space frees up.
-    MediaSampleHelio* m_enqueuedSample;
-    rcv_cursor_t *m_enqueuedSampleCursor;
+    // TODO: Cange this to a RefPtr
+    //RefPtr<MediaSampleHelio> m_enqueuedSample;
+    MediaSampleHelio *m_enqueuedSample;
+    
+    // TODO: This needs to be somewhere else...
+//    uint8_t *sps_nal;
+//    uint16_t sps_len;
+//    
+//    uint8_t *pps_nal;
+//    uint16_t pps_len;
+
 
 };
 }
