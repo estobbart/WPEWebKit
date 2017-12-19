@@ -11,6 +11,11 @@
 #include "TextureMapperPlatformLayerProxy.h"
 //#endif
 
+#include "PlayreadySession.h"
+
+#include <pthread.h>
+#include <queue>
+#include "rcvmf_isobmff.h"
 
 /**
  * The MediaPlayerPrivateHelio gets registered in platform/graphics/MediaPlayer.cpp
@@ -52,7 +57,7 @@ namespace WebCore {
 
 class MediaSourcePrivateHelio;
 
-class MediaPlayerPrivateHelio final : public MediaPlayerPrivateInterface 
+class MediaPlayerPrivateHelio final : public MediaPlayerPrivateInterface
 #if USE(COORDINATED_GRAPHICS_THREADED)
     , public PlatformLayer
 #endif
@@ -83,7 +88,7 @@ public:
     bool hasAudio() const override;
 
     void setVisible(bool) override;
-    
+
     /**
      * Duration is stored in the MediaSourcePrivateClient
      */
@@ -91,7 +96,7 @@ public:
 
     // TODO: We may want to support these as doubles
     virtual float currentTime() const;
-    
+
     /**
      * Not required to override, but seeking is nice..
      */
@@ -99,14 +104,14 @@ public:
     void seekDouble(double time); // { seek(time); }
     void seek(const MediaTime& time) { seekDouble(time.toDouble()); }
     void seekWithTolerance(const MediaTime& time, const MediaTime&, const MediaTime&) { seek(time); }
-    
+
     bool seeking() const override;
 
     bool paused() const override;
 
     MediaPlayer::NetworkState networkState() const override;
     MediaPlayer::ReadyState readyState() const override;
- 
+
     // Looks like this only gets used when calculating memory cost in MediaPlayerPrivate.h
     std::unique_ptr<PlatformTimeRanges> buffered() const override { return m_mediaPlayer->buffered(); }
 
@@ -121,50 +126,103 @@ public:
     bool supportsAcceleratedRendering() const override { return false; }
 #endif
 
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1)
+    /**
+     // Represents synchronous exceptions that can be thrown from the Encrypted Media methods.
+     // This is different from the asynchronous MediaKeyError.
+     enum MediaKeyException { NoError, InvalidPlayerState, KeySystemNotSupported };
+     */
+    MediaPlayer::MediaKeyException addKey(const String&, const unsigned char*, unsigned, const unsigned char*, unsigned, const String&) override;
+    //{ return MediaPlayer::KeySystemNotSupported; }
+    MediaPlayer::MediaKeyException generateKeyRequest(const String&, const unsigned char*, unsigned, const String&) override;
+    //{ return MediaPlayer::KeySystemNotSupported; }
+    MediaPlayer::MediaKeyException cancelKeyRequest(const String&, const String&) override;
+    //{ return MediaPlayer::KeySystemNotSupported; }
+#endif
+
     // TODO: This object as a proxy, is a little ugly.. may make more sense to
     // have the SourceBuffer call MediaPlayerPrivate methods directly.
 
     // To be able to report buffer status back to the MediaPlayer->client()
     // this method is exposed to the MediaSource can call it.
     void mediaSourcePrivateActiveSourceBuffersChanged();
-  
+
     // This proxies from the MediaSourcePrivate which receives the first
     // durationChanged call, through this object to the MediaPlayer
     void durationChanged();
-    
+
     rcv_media_clock_controller_t * platformClockController();
+
+    void sourceBufferDetectedEncryption(uint8_t *systemId, uint8_t *initData, size_t initDataLength);
+
+    void sourceBufferRequiresDecryptionEngine(std::function<void(PlayreadySession *)> task);
+
+    // Called by the SourceBuffer's to decrypt content..
+    // PlayreadySession* decryptionSession() { return prSession; }
+
+    void decryptionSessionStarted(std::unique_ptr<PlayreadySession> playReady) {
+        printf("MediaPlayerPrivateHelio::decryptionSessionStarted\n");
+        //LockHolder lock(&m_prSessionLock);
+        if (m_prSession == nullptr) {
+            printf("MediaPlayerPrivateHelio::decryptionSessionStarted m_prSession assignment\n");
+            m_prSession = std::move(playReady);
+        }
+    }
+
+    bool nextDecryptionSessionTask();
 
 protected:
     void setNetworkState(MediaPlayer::NetworkState);
 
 private:
-    
-    void setReadyState(MediaPlayer::ReadyState);
-    
-    MediaSourcePrivateClient* m_mediaSourceClient;
-    
-    MediaPlayer::NetworkState m_networkState; // TODO: This seems like it's managed
-    // at a higher level.
 
+    void setReadyState(MediaPlayer::ReadyState);
+
+    MediaSourcePrivateClient* m_mediaSourceClient;
+
+    MediaPlayer::NetworkState m_networkState;
     MediaPlayer::ReadyState m_readyState;
 
     uint8_t m_rate;
 
     static void _getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& types);
     static MediaPlayer::SupportsType _supportsType(const MediaEngineSupportParameters&);
+    static bool _supportsKeySystem(const String& keySystem, const String& mimeType); // MediaEngineSupportsKeySystem
 
     RefPtr<MediaSourcePrivateHelio> m_mediaSourcePrivate;
     // helio_t *m_helioEngine;
 
     MediaPlayer *m_mediaPlayer;
     rcv_media_clock_controller_t *m_platformClockController;
-    
+
+    // See MSE_Helio.md for notes about duration & durationChange events.
+    MediaTime m_lastReportedDuration;
+
     IntSize m_size;
 #if USE(COORDINATED_GRAPHICS_THREADED)
     RefPtr<TextureMapperPlatformLayerProxy> proxy() const override { return m_platformLayerProxy.copyRef(); }
     void swapBuffersIfNeeded() override { };
     void pushTextureToCompositor();
     RefPtr<TextureMapperPlatformLayerProxy> m_platformLayerProxy;
+#endif
+
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) && USE(PLAYREADY)
+    std::unique_ptr<PlayreadySession> m_prSession;
+    // This lock is only used to access the m_prSession
+    //mutable Lock m_prSessionLock;
+
+    // TODO: Move this into the PlayReady lib??
+    // uint8_t *m_initData;
+    // size_t m_initDataLength;
+
+    rcv_pssh_box_t *m_pssh;
+
+    std::queue<std::function<void(PlayreadySession *)>> m_emeQueue;
+    std::queue<std::function<void(PlayreadySession *)>> m_emeDecrypt;
+    pthread_cond_t m_queueCond;
+    pthread_mutex_t m_queueMutex;
+
+
 #endif
 
 };

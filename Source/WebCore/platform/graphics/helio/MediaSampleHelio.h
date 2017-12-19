@@ -16,7 +16,7 @@
 // https://developer.apple.com/documentation/coremedia/cmsamplebuffer?language=objc
 
 namespace WebCore {
-    
+
 typedef enum HelioCodecType {
     HelioCodecTypeUnknown,
     HelioCodecTypeAudio,
@@ -33,9 +33,9 @@ class HelioCodecConfiguration : public RefCounted<HelioCodecConfiguration> {
 public:
     HelioCodecConfiguration() { }
     virtual ~HelioCodecConfiguration() { }
-    
+
     virtual HelioCodecType codecType() const { return HelioCodecTypeUnknown; }
-    
+
     virtual void * decoderConfiguartion() const = 0;
 };
 
@@ -54,9 +54,9 @@ public:
         printf("HelioAudioCodecConfiguration ~HelioAudioCodecConfiguration\n");
         free(m_aacConf);
     }
-    
+
     HelioCodecType codecType() const { return HelioCodecTypeAudio; };
-    
+
     rcv_aac_config_t * decoderConfiguartion() const override { return m_aacConf; }
 
 private:
@@ -71,7 +71,7 @@ private:
         m_aacConf->sampling_frequency_index = sampling_frequency_index;
         m_aacConf->channel_config = channel_config;
     }
-    
+
     rcv_aac_config_t *m_aacConf;
 };
 
@@ -81,34 +81,34 @@ public:
         printf("HelioVideoCodecConfiguration::create\n");
         return adoptRef(*new HelioVideoCodecConfiguration(paramSets));
     }
-    
+
     ~HelioVideoCodecConfiguration() {
         printf("HelioVideoCodecConfiguration ~HelioVideoCodecConfiguration\n");
         // TODO: This is a mess.. refactor needed.
         free(m_paramSets->sps[0]->nal_unit);
         free(m_paramSets->pps[0]->nal_unit);
-        
+
         free(m_paramSets->sps[0]);
         free(m_paramSets->sps[1]);
-        
+
         free(m_paramSets->pps[0]);
         free(m_paramSets->pps[1]);
-        
+
         free(m_paramSets->sps);
         free(m_paramSets->pps);
-        
+
         free(m_paramSets);
     }
-    
+
     HelioCodecType codecType() const { return HelioCodecTypeVideo; };
-    
+
     rcv_param_sets_t * decoderConfiguartion() const override { return m_paramSets; }
 
 private:
     HelioVideoCodecConfiguration(rcv_param_sets_t *paramSets) {
         m_paramSets = paramSets;
     }
-    
+
     rcv_param_sets_t *m_paramSets;
 };
 
@@ -134,7 +134,7 @@ public:
                                               timescale,
                                               codecConf)); // TODO: WTF::move??
     }
-    
+
     /**
      * this is not an enumeration, it is a look ahead to determine if the buffer
      * being written to contains enough space for the next packet.
@@ -142,14 +142,16 @@ public:
      * returns 0.
      */
     uint32_t sizeOfNextPESPacket();
-    
+
     /**
      * A buffer with space larger than the current sizeOfNextPESPacket value
      * If the sample cursor is exhausted, no data will be written to the buffer
      * and the return value will be false.
      * The size_t* arg is optional by passing NULL.
      */
-    bool writeNextPESPacket(uint8_t **buffer, size_t *size);
+    bool writeNextPESPacket(uint8_t **buffer,
+                            size_t *size,
+                            std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt);
 
     /**
      * TODO: This will eventually be needed when we need to decrypt the content
@@ -168,6 +170,7 @@ private:
         m_cursor = rcv_cursor_init();
         m_mdatReadOffset = 0;
         m_ptsAccumulation = 0;
+        m_sencCursor = NULL;
 
         rcv_node_t *box = rcv_node_child(m_sample, "tfhd");
         if (box) {
@@ -177,7 +180,7 @@ private:
             printf("ERROR: MediaSampleHelio UNABLE TO GET rcv_tkhd_track_id\n");
             m_id = AtomicString::number(0);
         }
-        
+
         m_hasVideo = m_codecConf->codecType() == HelioCodecTypeVideo;
         m_hasAudio = m_codecConf->codecType() == HelioCodecTypeAudio;
 
@@ -193,7 +196,7 @@ private:
 //            } else {
 //                printf("ERROR: MediaSampleHelio hdlr_type:%s\n", hdlr_type);
 //            }
-//            
+//
 //        } else {
 //            printf("ERROR: MediaSampleHelio NO HDLR BOX\n");
 //        }
@@ -216,6 +219,9 @@ private:
 //            rcv_destory_tree(&m_codecConf);
 //        }
         if (m_cursor) {
+            rcv_cursor_destroy(&m_cursor);
+        }
+        if (m_sencCursor) {
             rcv_cursor_destroy(&m_cursor);
         }
         if (m_pesPacket) {
@@ -242,25 +248,25 @@ private:
      * size in bytes returns the size of the MDAT box.
      */
     size_t sizeInBytes() const override;
-    
+
     // it's width, height if video
     // TODO: Need to get this from the init header..
     FloatSize presentationSize() const override;
-    
+
     void offsetTimestampsBy(const MediaTime&) override;
-    
+
     // TODO: When is setTimestamps called??
     void setTimestamps(const MediaTime&, const MediaTime&) override;
-    
+
     bool isDivisable() const override;
-    
+
     std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> divide(const MediaTime& presentationTime) override;
-    
+
     // TODO: What's a non-displaying copy for?
     Ref<MediaSample> createNonDisplayingCopy() const override;
 
     SampleFlags flags() const override;
-    
+
     // TODO: Define PlatformSample for Helio
     PlatformSample platformSample() override;
 
@@ -272,19 +278,20 @@ private:
 
     rcv_node_t *m_sample;
     rcv_cursor_t *m_cursor;
+    rcv_cursor_t *m_sencCursor;
     cvmf_pes_t *m_pesPacket;
     uint64_t m_mdatReadOffset;
     int64_t m_ptsAccumulation;
 
     uint32_t m_timescale;
-    
+
     bool m_hasAudio;
     bool m_hasVideo;
-    
+
     RefPtr<HelioCodecConfiguration> m_codecConf;
-    
+
     MediaTime m_timestampOffset;
-  
+
     // Cached values.
     // TODO: Capture these values when a non-display copy is needed.
     MediaTime m_presentationTime;

@@ -5,7 +5,7 @@
 #import <math.h>
 
 namespace WebCore {
-    
+
 
 uint32_t MediaSampleHelio::sizeOfNextPESPacket() {
     rcv_node_t *box = rcv_node_child(m_sample, "trun");
@@ -28,31 +28,39 @@ uint32_t MediaSampleHelio::sizeOfNextPESPacket() {
                 // TODO: We don't support nal_length != 4
                 // Video only has an additional size if the nal_length
                 // isn't 4 bytes & it's not an IFrame.
-                
+
             }
             return pesSize;
         }
     }
     return 0;
 }
-    
 
-bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer, size_t *size) {
+
+bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer,
+                                          size_t *size,
+                                          std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt) {
     uint8_t *bufferHead = *buffer;
     rcv_node_t *box = rcv_node_child(m_sample, "trun");
     rcv_trun_box_t *trun = box ? RCV_TRUN_BOX(rcv_node_raw(box)) : NULL;
-    
+
     uint8_t *mdatBuffer = NULL;
     size_t mdatSize = 0;
     sampleBuffer(&mdatBuffer, &mdatSize);
-    
-    
+
+
     box = rcv_node_child(m_sample, "tfdt");
     rcv_tfdt_box_t *tfdt = box ? RCV_TFDT_BOX(rcv_node_raw(box)) : NULL;
 
-    if (trun && mdatBuffer && tfdt) {
+    if (trun && mdatBuffer && tfdt && m_cursor) {
+        // TODO: Is this cursor screwed up??
         rcv_sample_t *sample = rcv_trun_sample_next(trun, &m_cursor);
         if (sample) {
+            // TODO: Seem to be getting lipsync issues
+            // total hack.. needs to be moved/removed
+            // if (m_hasAudio && m_ptsAccumulation == 0) {
+            //     m_ptsAccumulation += 35000; // .38 ms - 3 frames
+            // }
             uint64_t pts = (m_ptsAccumulation
               + rcv_tfdt_base_media_decode_time(tfdt)
               + round(m_timestampOffset.toFloat() / m_timescale));
@@ -66,20 +74,20 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer, size_t *size) {
             } else if (m_hasVideo) {
                 // TODO: Move this condition into the else if
                 if (rcv_trun_sample_depends_on(sample) == rcv_sample_depends_false) {
-                    
+
                     // We don't consider this part of the header.
                     // the header would be if the nal_length didn't match
                     // the start_code 4 bytes, which is a a TODO to support
                     rcv_param_sets_t *paramSets = (rcv_param_sets_t *)m_codecConf->decoderConfiguartion();
                     sampleSize += paramSets->sps[0]->nal_len + 4;
                     sampleSize += paramSets->pps[0]->nal_len + 4;
-                    
+
                 }
-                
+
                 // TODO: We don't support nal_length != 4
                 // Video only has an additional size if the nal_length
                 // isn't 4 bytes & it's not an IFrame.
-                
+
             } else {
                 printf("ERROR: MediaSampleHelio::writeNextPESPacket !m_hasAudio && !m_hasVideo\n");
                 return false;
@@ -95,23 +103,110 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer, size_t *size) {
             memcpy(bufferHead, pesBuffer, pesSize);
             bufferHead += pesSize;
             *size += pesSize;
-            
+
             // This sampleSize value is confusing.. we use it to
             // write the ESStream packet size, then reassign it to be able to
             // do the MDAT memcopy & move the readOffset.
             sampleSize = rcv_trun_sample_size(sample);
             m_ptsAccumulation += rcv_trun_sample_duration(sample);
-            
+
+            // Encryption...
+            box = rcv_node_child(m_sample, "senc");
+            rcv_senc_box_t *senc = box ? RCV_SENC_BOX(rcv_node_raw(box)) : NULL;
+            if (senc) {
+                if (!m_sencCursor) {
+                    m_sencCursor = rcv_cursor_init();
+                }
+                rcv_senc_sample_t *sencSample = rcv_senc_sample_next(senc, &m_sencCursor);
+
+                uint8_t *iv = NULL;
+                uint8_t ivSize = 0;
+
+                rcv_senc_sample_iv_init(senc, sencSample, &iv, &ivSize);
+
+                if (rcv_senc_subsample_encryption(senc)) {
+
+                    uint16_t clearBytes = 0;
+                    uint32_t protectedBytes = 0;
+                    uint32_t subSampleBytes = 0;
+
+                    rcv_cursor_t *subSampleCursor = rcv_cursor_init();
+                    rcv_senc_subsample_t *subSample = NULL;
+
+                    // The decrypt calls are too expensive to do inplace decryption
+                    // over the mdat.
+                    uint8_t *encryptedBytes = malloc(sampleSize);
+                    uint32_t encryptedOffset = 0;
+
+                    do {
+                        subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
+
+                        if (!subSample) {
+                            break;
+                        }
+
+                        rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
+
+                        memcpy(&encryptedBytes[encryptedOffset], &mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], protectedBytes);
+                        encryptedOffset += protectedBytes;
+
+                        subSampleBytes += clearBytes + protectedBytes;
+
+                        // TOOD: These can't be decrypted individually...
+                        // if (subSampleBytes) {
+                        //     decrypt(NULL, 0, &mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], protectedBytes);
+                        // } else {
+                        //     decrypt(iv, ivSize, &mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], protectedBytes);
+                        // }
+                        // subSampleBytes += clearBytes + protectedBytes;
+
+                    } while (subSampleCursor);
+
+                    decrypt(iv, ivSize, encryptedBytes, encryptedOffset);
+
+                    subSampleCursor = rcv_cursor_init();
+                    encryptedOffset = 0;
+                    subSampleBytes = 0;
+
+                    do {
+                        subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
+
+                        if (!subSample) {
+                            break;
+                        }
+
+                        rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
+
+                        memcpy(&mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], &encryptedBytes[encryptedOffset], protectedBytes);
+                        encryptedOffset += protectedBytes;
+                        subSampleBytes += clearBytes + protectedBytes;
+
+                    } while (subSampleCursor);
+
+                    free(encryptedBytes);
+
+                    // rcv_senc_subsample_t *subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
+                    //
+                    // rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
+
+
+                } else {
+                    // std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt
+                    // TODO: Print the cost of this function..
+                    decrypt(iv, ivSize, &mdatBuffer[m_mdatReadOffset], sampleSize);
+                }
+            }
+
             if (m_hasAudio) {
                 rcv_aac_config_t *aacConf = (rcv_aac_config_t *)m_codecConf->decoderConfiguartion();
                 aac_adts_header_write(aacConf, sampleSize, &bufferHead);
                 bufferHead += headerSize;
                 *size += headerSize;
-                
+
                 memcpy(bufferHead, &mdatBuffer[m_mdatReadOffset], sampleSize);
                 *size += sampleSize;
                 m_mdatReadOffset += sampleSize;
-                
+
                 return true;
 
             } else if (m_hasVideo) {
@@ -130,16 +225,20 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer, size_t *size) {
                 }
                 *size += sampleSize;
                 m_mdatReadOffset += sampleSize;
-                
+
                 return true;
-                
+
             }
+        } else {
+            printf("MediaSampleHelio::writeNextPESPacket no more samples\n");
+            return false;
         }
     } else {
-        printf("ERROR: MediaSampleHelio::writeNextPESPacket !trun || !mdatBuffer || !tfdt\n");
+        printf("ERROR: MediaSampleHelio::writeNextPESPacket !trun || !mdatBuffer || !tfdt || !m_cursor\n");
     }
+    printf("ERROR: MediaSampleHelio::writeNextPESPacket REACH THE END WITHOUT A RETURN!\n");
     return false;
-    
+
 }
 
 MediaTime MediaSampleHelio::presentationTime() const {
@@ -262,7 +361,7 @@ void MediaSampleHelio::dump(PrintStream &ps __attribute__((unused))) const {
     // out.print("{PTS(", presentationTime(), "), DTS(", decodeTime(), "), duration(", duration(), "), flags(", (int)flags(), "), presentationSize(", presentationSize().width(), "x", presentationSize().height(), ")}");
     printf("MediaSampleHelio::dump...\n");
 }
-    
+
 void MediaSampleHelio::sampleBuffer(uint8_t **buffer, size_t *size) {
     rcv_node_t *node = rcv_node_child(m_sample, "mdat");
     if (!node) {
@@ -278,7 +377,7 @@ void MediaSampleHelio::sampleBuffer(uint8_t **buffer, size_t *size) {
         printf("MediaSampleHelio::sampleBuffer ----> :%zu \n", *size);
     }
 }
-    
+
 //void * MediaSampleHelio::box(char * fourcc) {
 //    rcv_node_t *node = rcv_node_child(m_sample, fourcc);
 //    if (node) {

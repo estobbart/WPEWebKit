@@ -63,11 +63,31 @@ namespace WebCore {
 //     // indicate that Movie Fragments are to be expected.
 //     // printf("_mvex_box_callback");
 // }
-    
+
+static void rcv_pssh_box_callback(void *ctx, rcv_node_t *node) {
+    printf("PSSH rcv_pssh_box_callback\n");
+
+    MediaPlayerPrivateHelio *helioMediaPlayer = (MediaPlayerPrivateHelio *)ctx;
+
+    //rcv_node_t *node = rcv_node_child(root, "pssh");
+    rcv_pssh_box_t *pssh = node ? RCV_PSSH_BOX(rcv_node_raw(node)) : NULL;
+
+    if (pssh && helioMediaPlayer) {
+        uint8_t *systemId = NULL;
+        uint8_t *initData = NULL;
+        size_t initDataLength = 0;
+
+        rcv_pssh_system_id(pssh, &systemId, NULL);
+        rcv_raw_box_buffer(pssh, &initData, &initDataLength);
+
+        helioMediaPlayer->sourceBufferDetectedEncryption(systemId, initData, initDataLength);
+    }
+}
+
 static void rcv_media_read_callback_source_buffer(void *context) {
     printf("SourceBufferPrivateHelio rcv_media_read_callback_source_buffer\n");
     SourceBufferPrivateHelio *sb = (SourceBufferPrivateHelio *)context;
-    
+
     sb->platformBufferAvailable();
 }
 
@@ -79,6 +99,12 @@ static void rcv_media_read_callback_source_buffer(void *context) {
     return adoptRef(new SourceBufferPrivateHelio(player, parent, codec));
 }
 
+// TODO: This needs to be fixed in librcvmf
+rcv_box_listener_t listeners[] = {
+    { "pssh", rcv_pssh_box_callback },
+    { NULL, NULL }
+};
+
 SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaPlayerPrivateHelio *player,
                                                    MediaSourcePrivateHelio *parent,
                                                    String codec)
@@ -88,22 +114,26 @@ SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaPlayerPrivateHelio *play
   , m_mediaSource(parent)
   , m_writeBufferAvailable(false)
   , m_isAudio(false)
-  , m_isVideo(false) {
+  , m_isVideo(false)
+  , m_encryptedSamples(false)
+  , m_notifyReadyForSample(false)
+  , m_trackId() {
       printf("SourceBufferPrivateHelio constructor: %s\n", codec.utf8().data());
 
     m_isobmffInitSegmentRoot = NULL;
-    m_enqueuedSample = NULL;
-      
+    m_enqueuedSample = nullptr;
+
     // TODO: Create a "program" to play based on the content type and codec
     m_mediaPipeline = NULL;
     m_mediaStream = rcv_media_stream_init(rcv_media_read_callback_source_buffer,
                                           this,
                                           codec.utf8().data());
-    m_rcvmfParser = rcv_parser_init(NULL, NULL);
+    m_rcvmfParser = rcv_parser_init(m_mediaPlayer, listeners);
 }
 
 SourceBufferPrivateHelio::~SourceBufferPrivateHelio() {
     printf("SourceBufferPrivateHelio destructor\n");
+    m_engineTaskQueue.close();
     if (m_rcvmfParser) {
         rcv_parser_destroy(&m_rcvmfParser);
     }
@@ -165,12 +195,12 @@ void SourceBufferPrivateHelio::append(const unsigned char* data,
     rcv_node_t *root = rcv_node_init();
     rcv_parse_isobmff(m_rcvmfParser, root, data, length);
 
-//    printf("SourceBufferPrivateHelio rcv_parse_isobmff(m_rcvmfParser, root, data, length) DONE;\n");
+    printf("SourceBufferPrivateHelio rcv_parse_isobmff(m_rcvmfParser, root, data, length) DONE;\n");
 
     if (rcv_node_child(root, "mdat")) {
-        
+
         appendSuccess = this->didDetectISOBMFFMediaSegment(root);
-        
+
         if (!appendSuccess) {
             rcv_destory_tree(&root);
         }
@@ -179,15 +209,15 @@ void SourceBufferPrivateHelio::append(const unsigned char* data,
         // TODO: ^ this is sort a bad else if, moov & moof instead?
 
         appendSuccess = this->didDetectISOBMFFInitSegment(root);
-        
+
         m_isobmffInitSegmentRoot = root;
-        
+
 //        rcv_destory_tree(&root);
     }
-    
+
     printf("SourceBufferPrivateHelio sourceBufferPrivateAppendComplete %s\n",
            appendSuccess ? "AppendSucceeded" : "ERROR: ParsingFailed");
-    
+
     m_client->sourceBufferPrivateAppendComplete(this,
         appendSuccess ? SourceBufferPrivateClient::AppendSucceeded : SourceBufferPrivateClient::ParsingFailed);
 
@@ -199,13 +229,13 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
     rcv_node_t *box;
     box = rcv_node_child(root, "tkhd");
     if (box) {
-        
+
         SourceBufferPrivateClient::InitializationSegment segment;
-        
+
         rcv_tkhd_box_t *tkhd = RCV_TKHD_BOX(rcv_node_raw(box));
-        
+
         uint32_t id = rcv_tkhd_track_id(tkhd);
-        
+
         box = rcv_node_child(root, "mvhd");
         if (box) {
             rcv_mvhd_box_t *mvhd = RCV_MVHD_BOX(rcv_node_raw(box));
@@ -218,7 +248,7 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
             //            printf("NO SUCH MVHD BOX MVHD TIMESCALE USING 90000\n");
             //            m_timescale = 90000;
         }
-        
+
         // NOTE: We're going to stick to the TKHD since it's a track we work
         // with at this layer..
         if (rcv_tkhd_duration_is_max(tkhd)) {
@@ -243,7 +273,7 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
 //        if (rcv_stsd_sample_entry_type(RCV_STSD_BOX(box))) {
 //            m_trackDescription = MediaDescriptionHelio::create(rcv_stsd_sample_entry_type(RCV_STSD_BOX(box)));
 //        } else {
-        
+
 //            printf("SourceBufferPrivateHelio:: rcv_stsd_sample_entry_type%s\n",
 //                   rcv_stsd_sample_entry_type(RCV_STSD_BOX(box)));
             box = rcv_node_first_child(box);
@@ -318,6 +348,7 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
                 vtInfo.track = VideoTrackPrivateHelio::create(id);
                 vtInfo.description = m_trackDescription;
                 printf("SourceBufferPrivateHelio VideoTrackPrivateHelio m_id:%s\n", vtInfo.track->id().string().utf8().data());
+                m_trackId = vtInfo.track->id();
 
                 segment.videoTracks.append(vtInfo);
             } else if (strcmp(format, "soun") == 0) {
@@ -354,6 +385,7 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
                 atInfo.description = m_trackDescription;
 
                 printf("SourceBufferPrivateHelio AudioTrackPrivateHelio m_id:%s\n", atInfo.track->id().string().utf8().data());
+                m_trackId = atInfo.track->id();
                 segment.audioTracks.append(atInfo);
             }
 
@@ -374,10 +406,12 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFMediaSegment(rcv_node_t *root) {
     Ref<MediaSample> mediaSample = MediaSampleHelio::create(root,
                                                             m_timescale,
                                                             m_codecConfiguration);
+    rcv_node_t *sencNode = rcv_node_child(root, "senc");
+    m_encryptedSamples = sencNode != NULL;
 
     printf("SourceBufferPrivateHelio sourceBufferPrivateDidReceiveSample\n");
     m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
-    
+
     return true;
 }
 
@@ -406,7 +440,7 @@ void SourceBufferPrivateHelio::setReadyState(MediaPlayer::ReadyState readyState)
 void SourceBufferPrivateHelio::flush(AtomicString as) {
     printf("TODO: SourceBufferPrivateHelio flush:%s\n", as.string().utf8().data());
 }
-    
+
 void hex_dump_buffer(uint8_t *buffer, size_t size) {
     uint8_t count = 0;
     while (size) {
@@ -423,13 +457,106 @@ void hex_dump_buffer(uint8_t *buffer, size_t size) {
         printf("\n");
     }
 }
-    
+
+// void SourceBufferPrivateHelio::enqueueSample(Ref<MediaSample>&& sample, AtomicString as) {
 void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample, AtomicString as) {
-    printf("SourceBufferPrivateHelio enqueueSample:%s\n", as.string().utf8().data());
+    printf("SourceBufferPrivateHelio enqueueSample: %s\n", as.string().utf8().data());
+    m_notifyReadyForSample = false;
+
     m_writeBufferAvailable = false;
 
-    //uint8_t *mdatBuffer;
-    //size_t size;
+// TODO: this needs to merge... but as a temporary hack I don't want to break
+// unencrypted playback
+    if (m_encryptedSamples) {
+        m_enqueuedSample = static_cast<MediaSampleHelio *>(mediaSample.get());
+        // TODO: make an isEncrypted per sample..
+        m_mediaPlayer->sourceBufferRequiresDecryptionEngine([this](PlayreadySession *prSession) {
+            printf("m_mediaPlayer->sourceBufferRequiresDecryptionEngine task start\n");
+
+            // Pointer to the buffer we can fill with PES packets
+            uint8_t *writeBuffer = NULL;
+            // number of bytes available in the buffer we can fill
+            size_t totalAvailable = 0;
+            size_t bufferAvailable = 0;
+            // rcv_media_stream_write(m_mediaStream, writeBuffer, writeSize);
+            if (!rcv_media_stream_buffer(m_mediaStream, &writeBuffer, &totalAvailable)) {
+                printf("ERROR SourceBufferPrivateHelio unable to get buffer from pool\n");
+                //m_enqueuedSample = static_cast<MediaSampleHelio *>(mediaSample.get());
+                return;
+            }
+
+            bufferAvailable = totalAvailable;
+
+            //printf("SourceBufferPrivateHelio static_cast<MediaSampleHelio *>\n");
+            MediaSampleHelio* helioSample = m_enqueuedSample.get(); // static_cast<MediaSampleHelio *>(mediaSample.get());
+            m_enqueuedSample = nullptr;
+            printf("SourceBufferPrivateHelio NEXUS buffer available:%zu\n", bufferAvailable);
+            while (bufferAvailable >= helioSample->sizeOfNextPESPacket()) {
+                size_t writeSize = 0;
+                // the sig of the lambda and the
+                // std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt
+                // printf("helioSample->writeNextPESPacket\n");
+                if (!helioSample->writeNextPESPacket(&writeBuffer, &writeSize,
+                    [prSession](const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize){
+                        // printf("prSession->processPayload\n");
+                        return prSession->processPayload(iv, ivSize, payloadData, payloadDataSize);
+                    })
+                ) {
+                    printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket BREAK\n");
+                    break;
+                }
+                bufferAvailable -= writeSize;
+                writeBuffer += writeSize;
+        //        printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket:%zu\n", writeSize);
+            }
+
+            // We've got more samples to write, but probably ran out of space.
+            if (helioSample->sizeOfNextPESPacket()) {
+                printf("SourceBufferPrivateHelio::enqueueSample ERROR Data to write in this sample, but no more space in the buffer, m_enqueuedSample%zu\n", helioSample->sizeOfNextPESPacket());
+                m_enqueuedSample = helioSample;
+            } else {
+                m_enqueuedSample = nullptr;
+            }
+
+            // DEBUG
+            // hex_dump_buffer(buffer, first_sample_size + pps_len + sps_len + 4);
+
+            if (writeBuffer == NULL) {
+                return;
+            }
+
+            //printf("SourceBufferPrivateHelio will write.. writeBuffer:%p\n", writeBuffer);
+
+            if (totalAvailable == bufferAvailable) {
+                printf("SourceBufferPrivateHelio ERROR NO DATA WRITTEN TO THE BUFFER\n");
+            }
+
+            // TODO: If the write is zero (the buffer is at the tail end and
+            // doesn't have enough space for a packet) The buffer is skipped
+            // but the engine immediately moves to the head of the ring buffer
+            // and invokes the callback that the buffer is available.
+            // because we currently are holding the lock with this task
+            // the next task request becomes deadlocked.
+            // This is an attempt to let the lock release so that if
+            // the engine calls back in here we don't become deadlocked.
+            // ideally the engine should wait to invoke the callback
+            // and should be fixed in the engine layer.
+            uint32_t writeSize = totalAvailable - bufferAvailable;
+            if (rcv_media_stream_write(m_mediaStream, writeSize)) {
+                printf("SourceBufferPrivateHelio WRITE SUCCESS\n");
+            } else {
+                printf("ERROR: SourceBufferPrivateHelio WRITE ERROR\n");
+            }
+
+            if (m_notifyReadyForSample && m_writeBufferAvailable) {
+                callOnMainThread([this](){
+                    // sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) = 0;
+                    m_client->sourceBufferPrivateDidBecomeReadyForMoreSamples(this, m_trackId);
+                });
+            }
+        });
+        return;
+    }
 
     // Pointer to the buffer we can fill with PES packets
     uint8_t *writeBuffer = NULL;
@@ -442,289 +569,44 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
         m_enqueuedSample = static_cast<MediaSampleHelio *>(mediaSample.get());
         return;
     }
-    
-//    while (totalAvailable < 50000) {
-//        printf("ERROR SourceBufferPrivateHelio totalAvailable < 500000\n sleep...");
-//        WTF::sleep(2);
-//        rcv_media_stream_buffer(m_mediaStream, &writeBuffer, &totalAvailable);
-//        printf("SourceBufferPrivateHelio NEXUS buffer available:%zu\n", totalAvailable);
-//    }
-    
+
     bufferAvailable = totalAvailable;
 
     printf("SourceBufferPrivateHelio static_cast<MediaSampleHelio *>\n");
     MediaSampleHelio* helioSample = static_cast<MediaSampleHelio *>(mediaSample.get());
-    printf("SourceBufferPrivateHelio NEXUS buffer available:%zu\n", bufferAvailable);
+    printf("SourceBufferPrivateHelio NEXUS buffer available:%zu next packet:%zu\n", bufferAvailable, helioSample->sizeOfNextPESPacket());
     while (bufferAvailable >= helioSample->sizeOfNextPESPacket()) {
         size_t writeSize = 0;
-        if (!helioSample->writeNextPESPacket(&writeBuffer, &writeSize)) {
-            printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket BREAK\n");
+        if (!helioSample->writeNextPESPacket(&writeBuffer, &writeSize, [](const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize) -> int {
+            printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket NO-OP decrypt!! ERROR\n");
+            return 0;
+        })) {
+            printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket BREAK: Should be 0 %zu\n", writeSize);
             break;
         }
         bufferAvailable -= writeSize;
         writeBuffer += writeSize;
 //        printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket:%zu\n", writeSize);
     }
-    
+
     // We've got more samples to write, but probably ran out of space.
     if (helioSample->sizeOfNextPESPacket()) {
         printf("SourceBufferPrivateHelio::enqueueSample ERROR Data to write in this sample, but no more space in the buffer, m_enqueuedSample%zu\n", helioSample->sizeOfNextPESPacket());
         m_enqueuedSample = helioSample;
+    } else {
+        m_enqueuedSample = nullptr;
     }
 
 
-//    printf("SourceBufferPrivateHelio helioSample->sampleBuffer DONE\n");
-//
-//    rcv_trun_box_t *trun = RCV_TRUN_BOX(helioSample->box("trun"));
-//    printf("SourceBufferPrivateHelio RCV_TRUN_BOX(helioSample->box('trun'))\n");
-//
-////    if (!m_enqueuedSampleCursor) {
-////        m_enqueuedSampleCursor = rcv_cursor_init();
-////    }
-//
-//    rcv_tfdt_box_t *tfdt = RCV_TFDT_BOX(helioSample->box("tfdt"));
-//    uint64_t decodeTimeBase = rcv_tfdt_base_media_decode_time(tfdt);
-//    //printf("decodeTimeBase:%llu\n", decodeTimeBase);
-//
-//    // Base 187680 + CTO (-3754) + duration (3754 x 2) = 191434
-//    uint64_t durationSum = 0;
-//    
-//    uint32_t sampleSize = 0;
-//    
-//    rcv_sample_t *sample;
-//
-//    if (m_isVideo) {
-//        printf("SourceBufferPrivateHelio isVideo\n");
-//        //typedef uint32_t (*nalu_sample_size_next)(void *ctx);
-//
-//        //typedef bool (*nalu_key_frame_headers_next)(void *ctx, uint8_t **nal_unit, uint16_t *length);
-//
-//        // TODO: Might be easier to just pass the avcC config here..
-//
-////        rcv_nal_param_t **sps = (rcv_nal_param_t **)malloc(sizeof(rcv_nal_param_t *) * 2);
-////        sps[0] = malloc(sizeof(rcv_nal_param_t));
-////        sps[0]->nal_unit = sps_nal;
-////        sps[0]->nal_len = sps_len;
-////        sps[1] = malloc(sizeof(rcv_nal_param_t));
-////        sps[1]->nal_unit = NULL;
-////        sps[1]->nal_len = 0;
-//        //printf("SourceBufferPrivateHelio rcv_nal_param_t **sps\n");
-//
-////        rcv_nal_param_t **pps = (rcv_nal_param_t **)malloc(sizeof(rcv_nal_param_t *) * 2);
-////        pps[0] = malloc(sizeof(rcv_nal_param_t));
-////        pps[0]->nal_unit = pps_nal;
-////        pps[0]->nal_len = pps_len;
-////        pps[1] = malloc(sizeof(rcv_nal_param_t));
-////        pps[1]->nal_unit = NULL;
-////        pps[1]->nal_len = 0;
-//        //printf("SourceBufferPrivateHelio rcv_nal_param_t **pps\n");
-//
-////        rcv_param_sets_t param_sets = { sps, pps };
-//
-//        // This is a mess.. need a better way to get this size..
-//        // Create a write buffer the size of the mdatBuffer + pps + sps + PES
-//        // printf("SourceBufferPrivateHelio size:%zu sps_len:%u pps_len:%u", size, sps_len, pps_len);
-//        // writeSize = size + sps_len + 4 + pps_len + 4;
-//        // * 14 needs to happen PER sample.. right now it's only a single sample.
-//        // printf("SourceBufferPrivateHelio sample count:%u\n", rcv_trun_sample_count(trun));
-//        // writeSize += rcv_trun_sample_count(trun) * 14;
-//        // printf("SourceBufferPrivateHelio writeSize %zu\n", writeSize);
-//        // writeBuffer = malloc(writeSize);
-//
-//        sample = rcv_trun_sample_next(trun, &m_enqueuedSampleCursor);
-//        //printf("cto_apply:%llu\n", (durationSum + decodeTimeBase));
-//        //printf("duration:%lu size:%lu cto:%llu\n", rcv_trun_sample_duration(sample), rcv_trun_sample_size(sample), rcv_trun_sample_apply_cto(trun, sample, durationSum + decodeTimeBase));
-//
-//        cvmf_pes_t *pes = cvmf_pes_create(cvmf_pes_type_video);
-//        // This comes in as 32 bits, but the size can only be 16 bits..
-//        // TODO: Add an additional check here
-//        sampleSize = rcv_trun_sample_size(sample);
-//        printf("SourceBufferPrivateHelio sampleSize:%lu\n", sampleSize);
-//        cvmf_pes_set_size(pes, sampleSize + sps_len + 4 + pps_len + 4);
-//
-//        // even though we allow a uint64_t here the max value is
-//        // 8589934591 (0x1FFFFFFFF) 33bits.
-//        //printf("1 decodeTimeBase:%llu rcv_trun_sample_cto(sample):%lu durationSum:%llu\n", decodeTimeBase, rcv_trun_sample_cto(sample), durationSum);
-//        //printf("1 decodeTimeBase:%llu\n", decodeTimeBase);
-//        cvmf_pes_set_pts(pes, rcv_trun_sample_apply_cto(trun, sample, durationSum + decodeTimeBase));
-//        durationSum += rcv_trun_sample_duration(sample);
-//
-//        // TODO: Write PES..
-//        uint8_t *pesBuffer = NULL;
-//        size_t pesSize = 0;
-//        cvmf_pes_raw(pes, &pesBuffer, &pesSize);
-//        // void *memcpy(void *dest, const void *src, size_t n);
-//        // TODO: Need a write offset..
-//        if (bufferAvailable >= pesSize) {
-//            memcpy(writeBuffer, pesBuffer, pesSize);
-//            printf("SourceBufferPrivateHelio writeBuffer:%p\n", writeBuffer);
-//            writeBuffer += pesSize;
-//            bufferAvailable -= pesSize;
-//        }
-//        
-//        
-//        //uint8_t *writePointer = &writeBuffer[pesSize];
-//
-//        // TODO: Write ES sample
-//        avc_frame_to_annex_b(&param_sets, 3,
-//                             mdatBuffer, sampleSize,
-//                             [](void *ctx, uint8_t *buffer, size_t size){
-//                                 uint8_t **wb = (uint8_t **)ctx;
-//                                 //printf("writePointer:%p\n", *wb);
-//                                 memcpy(*wb, buffer, size);
-//                                 *wb += size;
-//                             }, &writeBuffer);
-//        mdatBuffer += sampleSize;
-//        bufferAvailable -= sampleSize + sps_len + 4 + pps_len + 4;
-//
-//        //printf("2 decodeTimeBase:%llu\n", decodeTimeBase);
-//
-//        while (sample != NULL) {
-//            sample = rcv_trun_sample_next(trun, &m_enqueuedSampleCursor);
-//            if (sample == NULL) {
-//                break;
-//            }
-//
-//            // printf("duration:%lu size:%lu cto:%llu\n", rcv_trun_sample_duration(sample), rcv_trun_sample_size(sample), rcv_trun_sample_apply_cto(trun, sample, durationSum + decodeTimeBase));
-//
-//            // This comes in as 32 bits, but the size can only be 16 bits..
-//            // TODO: Add an additional check here
-//            sampleSize = rcv_trun_sample_size(sample);
-//            
-//            if (sampleSize + 14 > bufferAvailable) {
-//                printf("WARN SourceBufferPrivateHelio out of space in buffer\n");
-//                m_enqueuedSample = static_cast<MediaSampleHelio *>(mediaSample.get());
-//                break;
-//            }
-//
-//            // printf("sampleSize:%lu\n", sampleSize);
-//            cvmf_pes_set_size(pes, sampleSize);
-//
-//            // even though we allow a uint64_t here the max value is
-//            // 8589934591 (0x1FFFFFFFF) 33bits.
-//            cvmf_pes_set_pts(pes, rcv_trun_sample_apply_cto(trun, sample, durationSum + decodeTimeBase));
-//            durationSum += rcv_trun_sample_duration(sample);
-//
-//            // TODO: Write PES..
-//            // cvmf_pes_raw(cvmf_pes_t *pes, uint8_t **raw, size_t *size);
-//            cvmf_pes_raw(pes, &pesBuffer, &pesSize);
-//            memcpy(writeBuffer, pesBuffer, pesSize);
-//            writeBuffer += pesSize;
-//            bufferAvailable -= pesSize;
-//
-//            // TODO: Write ES sample
-//            // TODO: This needs the same pointer
-//            avc_frame_to_annex_b(NULL, 3,
-//                                 mdatBuffer, sampleSize,
-//                                 [](void *ctx, uint8_t *buffer, size_t size){
-//                                     uint8_t **wb = (uint8_t **)ctx;
-//                                     //printf("writePointer:%p\n", *wb);
-//                                     memcpy(*wb, buffer, size);
-//                                     *wb += size;
-//                                 }, &writeBuffer);
-//            mdatBuffer += sampleSize;
-//            bufferAvailable -= sampleSize;
-//        }
-//
-//        cvmf_pes_destroy(&pes);
-//
-//
-////        printf("SourceBufferPrivateHelio avc_to_annex_b\n");
-////        avc_to_annex_b(&param_sets, sample_size_iterator, &sample_ctx,
-////                       rcv_trun_sample_count(trun), 3,
-////                       &mdatBuffer, &size);
-//        printf("SourceBufferPrivateHelio avc_to_annex_b DONE\n");
-//        free(sps[0]);
-//        free(sps[1]);
-//        free(sps);
-//        free(pps[0]);
-//        free(pps[1]);
-//        free(pps);
-//        printf("SourceBufferPrivateHelio FREEING... DONE\n");
-//        //first_sample_size = sample_ctx.one_sample;
-//    } else {
-//        // AUDIO...
-//        
-////        printf("SourceBufferPrivateHelio sample count:%u\n", rcv_trun_sample_count(trun));
-////        writeSize = size + (rcv_trun_sample_count(trun) * 21);
-////        printf("SourceBufferPrivateHelio writeSize %zu\n", writeSize);
-////        writeBuffer = malloc(writeSize);
-////        
-////        uint8_t *writePointer = writeBuffer;
-//        uint8_t *pesBuffer = NULL;
-//        size_t pesSize = 0;
-//        cvmf_pes_t *pes = cvmf_pes_create(cvmf_pes_type_audio);
-//
-//        
-//        // printf("SourceBufferPrivateHelio esds..\n");
-//        rcv_esds_box_t *esds = RCV_ESDS_BOX(helioSample->box("esds"));
-//        // printf("SourceBufferPrivateHelio rcv_esds_decoder_specifc_info\n");
-//        rcv_decoder_specific_info_t *dsi = rcv_esds_decoder_specifc_info(esds);
-//        // printf("SourceBufferPrivateHelio rcv_esds_decoder_specifc_info audio_type, sample, channel\n");
-//        // TODO: Fix this!!!!!!!!!!!!!!!! the data is in the initSegment
-//        uint8_t aot = 2;//rcv_esds_dsi_audio_object_type(dsi);
-//        uint8_t sfi = 6;//rcv_esds_dsi_sampling_frequency_index(dsi);
-//        uint8_t cc = 2;//rcv_esds_dsi_channel_config(dsi);
-//        // This comes in as 32 bits, but the size can only be 16 bits..
-//        // TODO: Add an additional check here
-//        do {
-//            sample = rcv_trun_sample_next(trun, &m_enqueuedSampleCursor);
-//            if (sample == NULL) {
-//                break;
-//            }
-//            sampleSize = rcv_trun_sample_size(sample);
-//            
-//            if (sampleSize + 14 + 7 > bufferAvailable) {
-//                printf("WARN SourceBufferPrivateHelio out of space in buffer\n");
-//                m_enqueuedSample = static_cast<MediaSampleHelio *>(mediaSample.get());
-//                break;
-//            }
-//
-//            // plus the ADTS size (7)
-//            //printf("set_size:%lu\n", sampleSize + 7);
-//            cvmf_pes_set_size(pes, sampleSize + 7);
-//            
-//            cvmf_pes_set_pts(pes, rcv_trun_sample_apply_cto(trun, sample, durationSum + decodeTimeBase));
-//            
-//            durationSum += rcv_trun_sample_duration(sample);
-//            
-//            cvmf_pes_raw(pes, &pesBuffer, &pesSize);
-//            memcpy(writeBuffer, pesBuffer, pesSize);
-////            printf("writeBuffer:%p\n", writePointer);
-//            writeBuffer += pesSize;
-//            bufferAvailable -= pesSize;
-//            
-//            uint8_t *adtsbuffer = aac_adts_header_init(aot,
-//                                                       sfi,
-//                                                       cc,
-//                                                       sampleSize);
-//            memcpy(writeBuffer, adtsbuffer, 7);
-//            //            printf("writeBuffer:%p\n", writePointer);
-//            writeBuffer += 7;
-//            bufferAvailable -= 7;
-//            memcpy(writeBuffer, mdatBuffer, sampleSize);
-//            mdatBuffer += sampleSize;
-//            writeBuffer += sampleSize;
-//            bufferAvailable -= sampleSize;
-//            
-//        } while(sample);
-//        
-//        cvmf_pes_destroy(&pes);
-//    }
-
-    //printf("SourceBufferPrivateHelio WILL rcv_media_stream_write\n");
-    
     // DEBUG
-//    if (m_isVideo) {
-//        hex_dump_buffer(buffer, first_sample_size + pps_len + sps_len + 4);
-//    }
+    // hex_dump_buffer(buffer, first_sample_size + pps_len + sps_len + 4);
 
     if (writeBuffer == NULL) {
         return;
     }
 
     //printf("SourceBufferPrivateHelio will write.. writeBuffer:%p\n", writeBuffer);
-    
+
     if (totalAvailable == bufferAvailable) {
         printf("SourceBufferPrivateHelio ERROR NO DATA WRITTEN TO THE BUFFER\n");
     }
@@ -734,6 +616,7 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
     } else {
         printf("ERROR: SourceBufferPrivateHelio WRITE ERROR\n");
     }
+
 }
 
 // SourceBuffer calls this method twice before calling the notify method.
@@ -744,56 +627,66 @@ bool SourceBufferPrivateHelio::isReadyForMoreSamples(AtomicString as) {
     printf("SourceBufferPrivateHelio isReadyForMoreSamples TRACK:%s %i\n",
            as.string().utf8().data(), m_writeBufferAvailable);
 
-    return m_writeBufferAvailable;
+    return m_writeBufferAvailable && !m_enqueuedSample;
 }
 
 void SourceBufferPrivateHelio::setActive(bool active) {
     // At this point we should assume we're going to need an a/v pipeline
     // for this content.
     printf("SourceBufferPrivateHelio setActive:%i\n", active);
-    
-    if (active && m_mediaStream) {
-        printf("SourceBufferPrivateHelio creating pipeline\n");
-        m_mediaPipeline = rcv_media_pipeline_init(m_mediaStream,
-                                                  m_mediaPlayer->platformClockController());
-    }
-    // TODO: else rcv_media_pipeline_destroy??
 
-    // TODO: Why does this need the m_mediaPipeline??
-    m_mediaSource->sourceBufferPrivateActiveStateChanged(this, m_mediaPipeline);
+    m_engineTaskQueue.enqueueTask([this, active]() {
+        if (active && m_mediaStream) {
+            printf("SourceBufferPrivateHelio creating pipeline\n");
+            m_mediaPipeline = rcv_media_pipeline_init(m_mediaStream,
+                                                      m_mediaPlayer->platformClockController());
+        }
+        // TODO: else rcv_media_pipeline_destroy??
 
+        // TODO: Why does this need the m_mediaPipeline??
+        m_mediaSource->sourceBufferPrivateActiveStateChanged(this, m_mediaPipeline);
+    });
 }
 
 void SourceBufferPrivateHelio::notifyClientWhenReadyForMoreSamples(AtomicString trackId) {
-    // TODO:
-    printf("ERROR: SourceBufferPrivateHelio notifyClientWhenReadyForMoreSamples:%s ignoring\n", trackId.string().utf8().data());
+    printf("SourceBufferPrivateHelio notifyClientWhenReadyForMoreSamples: %s \n", trackId.string().utf8().data());
+    m_notifyReadyForSample = true;
 }
-    
+
 //void SourceBufferPrivateHelio::writeBufferAvailable() {
 //    //m_readyForMoreSamples = true;
 //}
-    
+
 // Called by the MediaSource as soon as all it's buffers become active
 // and the pipelines are connected.
 void SourceBufferPrivateHelio::startStream() {
     printf("SourceBufferPrivateHelio::startStream()\n");
     // TODO: at this point we MAY be ready for samples, but we wait until
     // the stream's data ready callback occurs.
-    rcv_media_pipeline_start_stream(m_mediaPipeline, m_mediaStream);
+    m_engineTaskQueue.enqueueTask([this]() {
+        rcv_media_pipeline_start_stream(m_mediaPipeline, m_mediaStream);
+    });
+
 }
 
 // callback from rcvmf
 void SourceBufferPrivateHelio::platformBufferAvailable() {
     printf("SourceBufferPrivateHelio::platformBufferAvailable()\n");
     if (m_enqueuedSample != NULL) {
-        PassRefPtr<MediaSample> mediaSample = m_enqueuedSample;
-        m_enqueuedSample = NULL;
-        // TODO: Need the atomic string..
         printf("SourceBufferPrivateHelio::platformBufferAvailable(), enqueuing previous sample\n");
-        enqueueSample(mediaSample, AtomicString("1"));
+        // TODO: Which thread does enqueueSample get called on?
+        callOnMainThread([this](){
+            enqueueSample(m_enqueuedSample, m_trackId);
+        });
         return;
     }
     m_writeBufferAvailable = true;
+    if (m_notifyReadyForSample && m_writeBufferAvailable) {
+        callOnMainThread([this](){
+            // sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) = 0;
+            m_client->sourceBufferPrivateDidBecomeReadyForMoreSamples(this, m_trackId);
+        });
+    }
 }
 
 }

@@ -7,6 +7,8 @@
 #include "rcvmf_isobmff.h"
 #include "rcvmf_media_pipeline.h"
 
+#include "GenericTaskQueue.h"
+
 #include <wtf/WeakPtr.h>
 
 //#include "helio.h"
@@ -77,8 +79,10 @@ public:
     // As soon as a sample is enqueued, it is erased from the decodeQueue
     // of the trackBuffer. NOTE(estobb200): At this point the memory
     // pointed to by the MediaSample shold be considered owned by libhelio
-    // again.
+    // again. <- this isn't 100%, it's possibly that it's still in a buffer
+    // until remove is called.
     void enqueueSample(PassRefPtr<MediaSample>, AtomicString) override;
+    // void enqueueSample(Ref<MediaSample>&&, AtomicString) override;
 
     // Called by the SourceBuffer during provideMediaData before calling
     // enqueueSample. provideMediaData generally occurs as soon as the
@@ -94,10 +98,10 @@ public:
     // Called by the SourceBuffer during provideMediaData after
     // it checks if we're ready for more samples, and we return false.
     void notifyClientWhenReadyForMoreSamples(AtomicString) override;
-    
+
     // Called by the MediaSource once all the created buffer's become active.
     void startStream();
-    
+
     // callback from rcvmf
     void platformBufferAvailable();
 
@@ -109,7 +113,7 @@ private:
 
     // During an append cycle, these methods would be called
     bool didDetectISOBMFFInitSegment(rcv_node_t *root);
-    
+
     bool didDetectISOBMFFMediaSegment(rcv_node_t *root);
 
     WeakPtr<SourceBufferPrivateHelio> createWeakPtr() { return m_weakFactory.createWeakPtr(); }
@@ -125,41 +129,40 @@ private:
     MediaSourcePrivateHelio *m_mediaSource;
 
     RefPtr<MediaDescriptionHelio> m_trackDescription;
-  
+
     // Captured from the MVHD box when the init segment is appended,
     // then provided to each MediaSample so that it can calculate it's
     // duration, cts & dts.
     uint32_t m_timescale;
-  
+
     bool m_writeBufferAvailable;
-    
+
     // m_mediaStream is data in to be processed
     rcv_media_stream_t *m_mediaStream;
     // m_mediaPipeline is decoder resources and read off the m_mediaStream
     // and get synchronized using the clock.
     rcv_media_pipeline_t *m_mediaPipeline;
-    
+
     bool m_isAudio;
     bool m_isVideo;
+    bool m_encryptedSamples;
 
     // TODO: Do we need to keep this?
     rcv_node_t *m_isobmffInitSegmentRoot;
-    
+
     RefPtr<HelioCodecConfiguration> m_codecConfiguration;
     // When an enqueued sample doesn't fit
     // in a buffer, it get's captured finishes
     // processing once additional space frees up.
     // TODO: Cange this to a RefPtr
-    //RefPtr<MediaSampleHelio> m_enqueuedSample;
-    MediaSampleHelio *m_enqueuedSample;
-    
-    // TODO: This needs to be somewhere else...
-//    uint8_t *sps_nal;
-//    uint16_t sps_len;
-//    
-//    uint8_t *pps_nal;
-//    uint16_t pps_len;
+    RefPtr<MediaSampleHelio> m_enqueuedSample;
 
+    GenericTaskQueue<Timer> m_engineTaskQueue;
+
+    // TODO: Capture a notify flag.
+    bool m_notifyReadyForSample;
+
+    AtomicString m_trackId;
 
 };
 }
