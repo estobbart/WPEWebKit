@@ -351,7 +351,7 @@ bool MediaPlayerPrivateHelio::nextDecryptionSessionTask() {
     // decryption
     printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask pthread_mutex_lock\n");
     pthread_mutex_lock(&m_queueMutex);
-    if (m_emeQueue.empty() || m_emeDecrypt.empty()) {
+    if (m_emeQueue.empty() && (m_emeDecrypt.empty() || !m_prSession->ready())) {
         printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask pthread_cond_wait\n");
         pthread_cond_wait(&m_queueCond, &m_queueMutex);
     }

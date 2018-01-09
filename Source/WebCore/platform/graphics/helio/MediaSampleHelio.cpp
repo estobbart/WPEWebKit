@@ -38,8 +38,10 @@ uint32_t MediaSampleHelio::sizeOfNextPESPacket() {
 
 
 bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer,
-                                          size_t *size,
-                                          std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt) {
+                                          size_t *size) {
+    if (isEncrypted()) {
+        printf("MediaSampleHelio::writeNextPESPacket ERROR buffer is encrypted\n");
+    }
     uint8_t *bufferHead = *buffer;
     rcv_node_t *box = rcv_node_child(m_sample, "trun");
     rcv_trun_box_t *trun = box ? RCV_TRUN_BOX(rcv_node_raw(box)) : NULL;
@@ -110,93 +112,6 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer,
             sampleSize = rcv_trun_sample_size(sample);
             m_ptsAccumulation += rcv_trun_sample_duration(sample);
 
-            // Encryption...
-            box = rcv_node_child(m_sample, "senc");
-            rcv_senc_box_t *senc = box ? RCV_SENC_BOX(rcv_node_raw(box)) : NULL;
-            if (senc) {
-                if (!m_sencCursor) {
-                    m_sencCursor = rcv_cursor_init();
-                }
-                rcv_senc_sample_t *sencSample = rcv_senc_sample_next(senc, &m_sencCursor);
-
-                uint8_t *iv = NULL;
-                uint8_t ivSize = 0;
-
-                rcv_senc_sample_iv_init(senc, sencSample, &iv, &ivSize);
-
-                if (rcv_senc_subsample_encryption(senc)) {
-
-                    uint16_t clearBytes = 0;
-                    uint32_t protectedBytes = 0;
-                    uint32_t subSampleBytes = 0;
-
-                    rcv_cursor_t *subSampleCursor = rcv_cursor_init();
-                    rcv_senc_subsample_t *subSample = NULL;
-
-                    // The decrypt calls are too expensive to do inplace decryption
-                    // over the mdat.
-                    uint8_t *encryptedBytes = malloc(sampleSize);
-                    uint32_t encryptedOffset = 0;
-
-                    do {
-                        subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
-
-                        if (!subSample) {
-                            break;
-                        }
-
-                        rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
-
-                        memcpy(&encryptedBytes[encryptedOffset], &mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], protectedBytes);
-                        encryptedOffset += protectedBytes;
-
-                        subSampleBytes += clearBytes + protectedBytes;
-
-                        // TOOD: These can't be decrypted individually...
-                        // if (subSampleBytes) {
-                        //     decrypt(NULL, 0, &mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], protectedBytes);
-                        // } else {
-                        //     decrypt(iv, ivSize, &mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], protectedBytes);
-                        // }
-                        // subSampleBytes += clearBytes + protectedBytes;
-
-                    } while (subSampleCursor);
-
-                    decrypt(iv, ivSize, encryptedBytes, encryptedOffset);
-
-                    subSampleCursor = rcv_cursor_init();
-                    encryptedOffset = 0;
-                    subSampleBytes = 0;
-
-                    do {
-                        subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
-
-                        if (!subSample) {
-                            break;
-                        }
-
-                        rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
-
-                        memcpy(&mdatBuffer[m_mdatReadOffset + subSampleBytes + clearBytes], &encryptedBytes[encryptedOffset], protectedBytes);
-                        encryptedOffset += protectedBytes;
-                        subSampleBytes += clearBytes + protectedBytes;
-
-                    } while (subSampleCursor);
-
-                    free(encryptedBytes);
-
-                    // rcv_senc_subsample_t *subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
-                    //
-                    // rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
-
-
-                } else {
-                    // std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt
-                    // TODO: Print the cost of this function..
-                    decrypt(iv, ivSize, &mdatBuffer[m_mdatReadOffset], sampleSize);
-                }
-            }
-
             if (m_hasAudio) {
                 rcv_aac_config_t *aacConf = (rcv_aac_config_t *)m_codecConf->decoderConfiguartion();
                 aac_adts_header_write(aacConf, sampleSize, &bufferHead);
@@ -239,6 +154,127 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer,
     printf("ERROR: MediaSampleHelio::writeNextPESPacket REACH THE END WITHOUT A RETURN!\n");
     return false;
 
+}
+
+bool MediaSampleHelio::isEncrypted() const {
+    return m_encryptedBuffer;
+}
+
+bool MediaSampleHelio::decryptBuffer(std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt) {
+    rcv_node_t *box = rcv_node_child(m_sample, "senc");
+    rcv_senc_box_t *senc = box ? RCV_SENC_BOX(rcv_node_raw(box)) : NULL;
+
+    uint8_t *mdatBuffer = NULL;
+    size_t mdatSize = 0;
+    sampleBuffer(&mdatBuffer, &mdatSize);
+
+
+    box = rcv_node_child(m_sample, "trun");
+    rcv_trun_box_t *trun = box ? RCV_TRUN_BOX(rcv_node_raw(box)) : NULL;
+
+    // TODO: Handle the else of this..
+    if (mdatBuffer && mdatSize && senc && trun) {
+
+        uint32_t mdatReadOffset = 0;
+        rcv_cursor_t *trunSampleCursor = rcv_cursor_init();
+        rcv_cursor_t *sencSampleCursor = rcv_cursor_init();
+
+        while (sencSampleCursor) {
+            rcv_senc_sample_t *sencSample = rcv_senc_sample_next(senc, &sencSampleCursor);
+            rcv_sample_t *trunSample = rcv_trun_sample_next(trun, &trunSampleCursor);
+
+            if (!sencSample || !trunSample) {
+                printf("MediaSampleHelio ERROR accessing samples from TRUN || SENC\n");
+                // TODO: Destroy cursors and return false;
+                break;
+            }
+
+            uint32_t sampleSize = rcv_trun_sample_size(trunSample);
+
+            uint8_t *iv = NULL;
+            uint8_t ivSize = 0;
+
+            rcv_senc_sample_iv_init(senc, sencSample, &iv, &ivSize);
+
+            uint8_t *encryptedBuffer = NULL;
+            size_t encryptedSize = 0;
+
+            // NOTE(estobb200): subsample encryption can be very costly to call
+            // multiple decrypt calls. It's more performant to malloc, memcpy
+            // decrpyt, and memcpy back. In place decryption can only be
+            // done when the whole mdat buffer is encrypted.
+            if (rcv_senc_subsample_encryption(senc)) {
+                uint16_t clearBytes = 0;
+                uint32_t protectedBytes = 0;
+                uint32_t subSampleBytes = 0;
+
+                rcv_cursor_t *subSampleCursor = rcv_cursor_init();
+                rcv_senc_subsample_t *subSample = NULL;
+
+                // TODO: It's possible this malloc may be smaller
+                encryptedBuffer = malloc(mdatSize);
+
+                do {
+                    subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
+
+                    if (!subSample) {
+                        break;
+                    }
+
+                    rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
+
+                    memcpy(&encryptedBuffer[encryptedSize], &mdatBuffer[mdatReadOffset + subSampleBytes + clearBytes], protectedBytes);
+                    encryptedSize += protectedBytes;
+
+                    subSampleBytes += clearBytes + protectedBytes;
+
+                } while (subSampleCursor);
+
+            } else {
+                encryptedBuffer = &mdatBuffer[mdatReadOffset];
+                encryptedSize = sampleSize;
+            }
+
+            uint32_t result = decrypt(iv, ivSize, encryptedBuffer, encryptedSize);
+            if (result) {
+                // TODO: If this errors return false
+                printf("MediaSampleHelio::decryptBuffer decrypt: %u\n", result);
+            }
+
+            if (rcv_senc_subsample_encryption(senc)) {
+                uint16_t clearBytes = 0;
+                uint32_t protectedBytes = 0;
+                uint32_t subSampleBytes = 0;
+
+                rcv_cursor_t *subSampleCursor = rcv_cursor_init();
+                rcv_senc_subsample_t *subSample = NULL;
+
+                uint32_t encryptedOffset = 0;
+
+                do {
+                    subSample = rcv_senc_subsample_next(sencSample, &subSampleCursor);
+
+                    if (!subSample) {
+                        break;
+                    }
+
+                    rcv_senc_subsample_byte_count(subSample, &clearBytes, &protectedBytes);
+
+                    memcpy(&mdatBuffer[mdatReadOffset + subSampleBytes + clearBytes], &encryptedBuffer[encryptedOffset], protectedBytes);
+                    encryptedOffset += protectedBytes;
+                    subSampleBytes += clearBytes + protectedBytes;
+
+                } while (subSampleCursor);
+
+                free(encryptedBuffer);
+            }
+
+            mdatReadOffset += sampleSize;
+
+        }
+    }
+    m_encryptedBuffer = false;
+    return true;
 }
 
 MediaTime MediaSampleHelio::presentationTime() const {
@@ -307,7 +343,7 @@ void MediaSampleHelio::offsetTimestampsBy(const MediaTime &mediaTime) {
 // TODO: It's not clear when/why this would be called.
 void MediaSampleHelio::setTimestamps(const MediaTime &mediaTimeOne __attribute__((unused)),
                                      const MediaTime &mediaTimeTwo __attribute__((unused))) {
-  printf("TODO: MediaSampleHelio::setTimestamps\n");
+  printf("ERROR TODO: MediaSampleHelio::setTimestamps\n");
 }
 
 // NOTE(estobb200): For video a sample would only be divisible if it had multiple
@@ -317,7 +353,7 @@ void MediaSampleHelio::setTimestamps(const MediaTime &mediaTimeOne __attribute__
 // a sample. But it still TDB if it's worth dividing them.
 // TODO: For audio we can divide while the sample count is > 1.
 bool MediaSampleHelio::isDivisable() const {
-    printf("MediaSampleHelio::isDivisable\n");
+    printf("MediaSampleHelio::isDivisable TODO\n");
     return false;
 }
 

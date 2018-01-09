@@ -148,16 +148,26 @@ public:
      * If the sample cursor is exhausted, no data will be written to the buffer
      * and the return value will be false.
      * The size_t* arg is optional by passing NULL.
+     *
+     * TODO: Move the decrypt function out of here..
      */
-    bool writeNextPESPacket(uint8_t **buffer,
-                            size_t *size,
-                            std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt);
+    bool writeNextPESPacket(uint8_t **buffer, size_t *size);
+
+
+    bool isEncrypted() const;
+
+    bool decryptBuffer(std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt);
 
     /**
      * TODO: This will eventually be needed when we need to decrypt the content
      */
     void sampleBuffer(uint8_t **buffer, size_t *size);
 //    void * box(char * fourcc);
+
+    // TODO: Why was this private?
+    AtomicString trackID() const override {
+        return m_id;
+    }
 
 private:
     MediaSampleHelio(rcv_node_t *root, uint32_t timescale, RefPtr<HelioCodecConfiguration>& codecConf)
@@ -170,7 +180,7 @@ private:
         m_cursor = rcv_cursor_init();
         m_mdatReadOffset = 0;
         m_ptsAccumulation = 0;
-        m_sencCursor = NULL;
+        m_encryptedBuffer = rcv_node_child(m_sample, "senc") != NULL;
 
         rcv_node_t *box = rcv_node_child(m_sample, "tfhd");
         if (box) {
@@ -221,9 +231,6 @@ private:
         if (m_cursor) {
             rcv_cursor_destroy(&m_cursor);
         }
-        if (m_sencCursor) {
-            rcv_cursor_destroy(&m_cursor);
-        }
         if (m_pesPacket) {
             cvmf_pes_destroy(&m_pesPacket);
         }
@@ -232,10 +239,6 @@ private:
     MediaTime presentationTime() const override;
     MediaTime decodeTime() const override;
     MediaTime duration() const override;
-
-    AtomicString trackID() const override {
-        return m_id;
-    }
 
     // TODO: TFHD is it's track ID, we shouldn't support set here.
     // TODO: Why is this part of the interface?
@@ -277,8 +280,7 @@ private:
     AtomicString m_id;
 
     rcv_node_t *m_sample;
-    rcv_cursor_t *m_cursor;
-    rcv_cursor_t *m_sencCursor;
+    rcv_cursor_t *m_cursor; // Is this the mdat cursor?
     cvmf_pes_t *m_pesPacket;
     uint64_t m_mdatReadOffset;
     int64_t m_ptsAccumulation;
@@ -297,6 +299,8 @@ private:
     MediaTime m_presentationTime;
     MediaTime m_decodeTime;
     MediaTime m_duration;
+
+    bool m_encryptedBuffer;
 };
 
 }
