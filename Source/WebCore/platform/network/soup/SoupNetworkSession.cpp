@@ -44,6 +44,8 @@
 #include <wtf/text/StringBuilder.h>
 #include <gwildcardproxyresolver.h>
 
+#include <sys/time.h> // gettimeofday
+
 namespace WebCore {
 
 static bool gIgnoreTLSErrors;
@@ -52,7 +54,10 @@ static CString gInitialAcceptLanguages;
 #if !LOG_DISABLED
 inline static void soupLogPrinter(SoupLogger*, SoupLoggerLogLevel, char direction, const char* data, gpointer)
 {
-    LOG(Network, "%c %s", direction, data);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    uint64_t now = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    LOG(Network, "%llu %c %s", now, direction, data);
 }
 #endif
 

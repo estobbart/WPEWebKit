@@ -382,6 +382,7 @@ MediaPlayer::MediaPlayer(MediaPlayerClient& client)
 
 MediaPlayer::~MediaPlayer()
 {
+    printf("MediaPlayer::~MediaPlayer()\n");
     ASSERT(!m_initializingMediaEngine);
 }
 
@@ -1193,6 +1194,7 @@ void MediaPlayer::muteChanged(bool newMuted)
 
 void MediaPlayer::timeChanged()
 {
+    printf("m_client.timeChanged()\n");
     m_client.mediaPlayerTimeChanged(this);
 }
 

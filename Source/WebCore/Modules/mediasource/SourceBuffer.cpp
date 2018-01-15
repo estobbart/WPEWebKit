@@ -63,6 +63,8 @@
 #include <wtf/text/StringBuilder.h>
 #endif
 
+#include <sys/time.h> // gettimeofday
+
 namespace WebCore {
 
 static const double ExponentialMovingAverageCoefficient = 0.1;
@@ -243,6 +245,10 @@ ExceptionOr<void> SourceBuffer::setAppendWindowEnd(double newValue)
 
 ExceptionOr<void> SourceBuffer::appendBuffer(const BufferSource& data)
 {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    uint64_t now = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    printf("SourceBuffer::appendBuffer(%p) @ %llu\n", this, now);
     return appendBufferInternal(static_cast<const unsigned char*>(data.data()), data.length());
 }
 
@@ -496,6 +502,11 @@ void SourceBuffer::scheduleEvent(const AtomicString& eventName)
 {
     auto event = Event::create(eventName, false, false);
     event->setTarget(this);
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    uint64_t now = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    printf("SourceBuffer::scheduleEvent(%p) %s @ %llu\n", this, eventName.string().utf8().data(), now);
 
     m_asyncEventQueue.enqueueEvent(WTFMove(event));
 }

@@ -16,6 +16,7 @@
 #include <pthread.h>
 #include <queue>
 #include "rcvmf_isobmff.h"
+#include "async_queue.h"
 
 /**
  * The MediaPlayerPrivateHelio gets registered in platform/graphics/MediaPlayer.cpp
@@ -171,6 +172,8 @@ public:
 
     bool nextDecryptionSessionTask();
 
+    void timerFired();
+
 protected:
     void setNetworkState(MediaPlayer::NetworkState);
 
@@ -198,7 +201,11 @@ private:
     // See MSE_Helio.md for notes about duration & durationChange events.
     MediaTime m_lastReportedDuration;
 
+    cvmf_async_queue_t *m_timeUpdateQueue;
+
     IntSize m_size;
+    double m_lastReportedTime;
+
 #if USE(COORDINATED_GRAPHICS_THREADED)
     RefPtr<TextureMapperPlatformLayerProxy> proxy() const override { return m_platformLayerProxy.copyRef(); }
     void swapBuffersIfNeeded() override { };

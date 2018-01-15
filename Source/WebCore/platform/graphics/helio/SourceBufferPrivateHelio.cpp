@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <string.h> // memcpy
 
+#include <sys/time.h> // gettimeofday
+
 #import <wtf/MainThread.h>
 
 //#import <pthread.h>
@@ -103,42 +105,11 @@ RefPtr<SourceBufferPrivateHelio> SourceBufferPrivateHelio::create(MediaPlayerPri
 }
 
 // TODO: This needs to be fixed in librcvmf
+// Since the listener was on the stack it was never called.
 rcv_box_listener_t listeners[] = {
     { "pssh", rcv_pssh_box_callback },
     { NULL, NULL }
 };
-
-// Used to signal back from the decryption thread that the sample
-// has been decrypted..
-// static pthread_cond_t kqCond;
-// static pthread_mutex_t kqMutex;
-// static pthread_t k_buffer_mgnt_thread_id = 0;
-// // TODO: This does not work!
-// static std::function<void()> callback = nullptr;
-//
-// static void *source_buffer_sample_mgnt(void *) {
-//     printf("SourceBufferPrivateHelio:: source_buffer_sample_mgnt thread START\n");
-//
-//     while (true) {
-//         printf("SourceBufferPrivateHelio:: source_buffer_sample_mgnt thread pthread_mutex_lock\n");
-//         pthread_mutex_lock(&kqMutex);
-//         if (!callback) {
-//             printf("SourceBufferPrivateHelio:: source_buffer_sample_mgnt thread pthread_cond_wait\n");
-//             pthread_cond_wait(&kqCond, &kqMutex);
-//             printf("SourceBufferPrivateHelio:: source_buffer_sample_mgnt thread pthread_cond_wait continue\n");
-//             continue;
-//         }
-//         // callOnMainThread([]{
-//         //     callback();
-//         // });
-//         printf("SourceBufferPrivateHelio:: source_buffer_sample_mgnt thread callback()\n");
-//         //callback();
-//         callback = nullptr;
-//         printf("SourceBufferPrivateHelio:: source_buffer_sample_mgnt thread pthread_mutex_unlock\n");
-//         pthread_mutex_unlock(&kqMutex);
-//     }
-//     printf("SourceBufferPrivateHelio source_buffer_sample_mgnt thread END\n");
-// }
 
 SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaPlayerPrivateHelio *player,
                                                    MediaSourcePrivateHelio *parent,
@@ -147,20 +118,12 @@ SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaPlayerPrivateHelio *play
   , m_weakFactory(this)
   , m_mediaPlayer(player)
   , m_mediaSource(parent)
-  , m_writeBufferAvailable(false)
-  , m_isAudio(false)
-  , m_isVideo(false)
-  , m_encryptedSamples(false)
   , m_notifyReadyForSample(false)
   , m_trackId() {
       printf("SourceBufferPrivateHelio constructor: %s\n", codec.utf8().data());
 
-    // if (!k_buffer_mgnt_thread_id) {
-    //     printf("SourceBufferPrivateHelio pthread_create buffer_mgnt_thread_id\n");
-    //     pthread_create(&k_buffer_mgnt_thread_id, NULL, source_buffer_sample_mgnt, NULL);
-    // }
+    m_asyncQueue = cvmf_queue_init();
 
-    m_isobmffInitSegmentRoot = NULL;
     m_enqueuedSample = nullptr;
 
     // TODO: Create a "program" to play based on the content type and codec
@@ -173,7 +136,7 @@ SourceBufferPrivateHelio::SourceBufferPrivateHelio(MediaPlayerPrivateHelio *play
 
 SourceBufferPrivateHelio::~SourceBufferPrivateHelio() {
     printf("SourceBufferPrivateHelio destructor\n");
-    m_engineTaskQueue.close();
+    cvmf_queue_destroy(&m_asyncQueue);
     if (m_rcvmfParser) {
         rcv_parser_destroy(&m_rcvmfParser);
     }
@@ -225,13 +188,21 @@ void SourceBufferPrivateHelio::setClient(SourceBufferPrivateClient* client) {
  */
 void SourceBufferPrivateHelio::append(const unsigned char* data,
                                       unsigned length) {
-    printf("SourceBufferPrivateHelio append size:%i\n", length);
+    printf("SourceBufferPrivateHelio(%p) append size:%i\n", this, length);
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    unsigned long long start =
+      (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+
+    printf("---------------------------------------------- > SourceBufferPrivateHelio(%p) append START: %llu\n", this, start);
 
     bool appendSuccess = false;
     if (!m_client) {
         return;
     }
 
+    printf("SourceBufferPrivateHelio rcv_parse_isobmff(m_rcvmfParser, root, data, length) DONE;\n");
     rcv_node_t *root = rcv_node_init();
     rcv_parse_isobmff(m_rcvmfParser, root, data, length);
 
@@ -248,19 +219,30 @@ void SourceBufferPrivateHelio::append(const unsigned char* data,
     } else if (rcv_node_child(root, "tkhd")) {
         // TODO: ^ this is sort a bad else if, moov & moof instead?
 
+        // TODO: This could be more async.. clock this to determine.
         appendSuccess = this->didDetectISOBMFFInitSegment(root);
 
-        m_isobmffInitSegmentRoot = root;
-
-//        rcv_destory_tree(&root);
+        // TODO: Test that the values we need have been copied out of this..
+        // rcv_destory_tree(&root);
     }
 
-    printf("SourceBufferPrivateHelio sourceBufferPrivateAppendComplete %s\n",
+    printf("SourceBufferPrivateHelio(%p) sourceBufferPrivateAppendComplete %s\n", this,
            appendSuccess ? "AppendSucceeded" : "ERROR: ParsingFailed");
+
+    gettimeofday(&tv, NULL);
+
+    unsigned long long end =
+      (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    printf("SourceBufferPrivateHelio append END: %llu TOTAL: %llu\n", end, end - start);
+
 
     m_client->sourceBufferPrivateAppendComplete(this,
         appendSuccess ? SourceBufferPrivateClient::AppendSucceeded : SourceBufferPrivateClient::ParsingFailed);
 
+    gettimeofday(&tv, NULL);
+    unsigned long long total =
+      (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    printf("---------------------------------------------- >  SourceBufferPrivateHelio(%p) append TOTAL: %llu\n", this, total - start);
 }
 
 bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
@@ -383,7 +365,6 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
                 param_sets->pps = pps;
                 m_codecConfiguration = HelioVideoCodecConfiguration::create(param_sets);
 
-                m_isVideo = true;
                 SourceBufferPrivateClient::InitializationSegment::VideoTrackInformation vtInfo;
                 vtInfo.track = VideoTrackPrivateHelio::create(id);
                 vtInfo.description = m_trackDescription;
@@ -419,7 +400,6 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
 
                 m_codecConfiguration = HelioAudioCodecConfiguration::create(aot, sfi, cc);
 
-                m_isAudio = true;
                 SourceBufferPrivateClient::InitializationSegment::AudioTrackInformation atInfo;
                 atInfo.track = AudioTrackPrivateHelio::create(id);
                 atInfo.description = m_trackDescription;
@@ -442,12 +422,13 @@ bool SourceBufferPrivateHelio::didDetectISOBMFFInitSegment(rcv_node_t *root) {
 
 bool SourceBufferPrivateHelio::didDetectISOBMFFMediaSegment(rcv_node_t *root) {
 
+    printf("SourceBufferPrivateHelio (%p) didDetectISOBMFFMediaSegment\n", this);
+
     // TODO: Does this local var produce ref count churn?
     Ref<MediaSample> mediaSample = MediaSampleHelio::create(root,
                                                             m_timescale,
                                                             m_codecConfiguration);
 
-    printf("SourceBufferPrivateHelio sourceBufferPrivateDidReceiveSample\n");
     m_client->sourceBufferPrivateDidReceiveSample(this, mediaSample);
 
     return true;
@@ -496,18 +477,14 @@ void hex_dump_buffer(uint8_t *buffer, size_t size) {
     }
 }
 
+// Newer signature from WebKit
 // void SourceBufferPrivateHelio::enqueueSample(Ref<MediaSample>&& sample, AtomicString as) {
 void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample, AtomicString as) {
-    printf("SourceBufferPrivateHelio enqueueSample: %s\n", as.string().utf8().data());
+    printf("SourceBufferPrivateHelio(%p) enqueueSample: %s\n", this, as.string().utf8().data());
 
-    //m_notifyReadyForSample = false;
-    m_writeBufferAvailable = false;
+    m_enqueuedSample = static_cast<MediaSampleHelio *>(mediaSample.get());
 
-    MediaSampleHelio *helioSample = static_cast<MediaSampleHelio *>(mediaSample.get());
-
-    if (helioSample->isEncrypted()) {
-
-        m_enqueuedSample = helioSample;
+    if (m_enqueuedSample->isEncrypted()) {
         m_mediaPlayer->sourceBufferRequiresDecryptionEngine([this](PlayreadySession *prSession) {
             printf("m_mediaPlayer->sourceBufferRequiresDecryptionEngine task START\n");
 
@@ -515,22 +492,12 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
                 prSession->processPayload(iv, ivSize, payloadData, payloadDataSize);
             });
 
-            // printf("SourceBufferPrivateHelio enqueueSample task lock\n");
-            // pthread_mutex_lock(&kqMutex);
-            // callback = [this](){
-            //     printf("SourceBufferPrivateHelio callback called!\n");
-            //     enqueueSample(m_enqueuedSample, m_enqueuedSample->trackID());
-            // };
-            //
-            // printf("SourceBufferPrivateHelio enqueueSample task pthread_cond_signal\n");
-            // pthread_cond_signal(&kqCond);
-            // printf("SourceBufferPrivateHelio enqueueSample task unlock\n");
-            // pthread_mutex_unlock(&kqMutex);
+            cvmf_task_t *task = cvmf_task_init([](cvmf_async_queue_t *, void *ctx){
+                SourceBufferPrivateHelio *helioSB = (SourceBufferPrivateHelio *)ctx;
+                helioSB->writeEnqueuedSample();
+            }, this);
 
-
-            m_engineTaskQueue.enqueueTask([this](){
-                enqueueSample(m_enqueuedSample, m_enqueuedSample->trackID());
-            });
+            enqueue_task(m_asyncQueue, task);
 
             printf("m_mediaPlayer->sourceBufferRequiresDecryptionEngine task END\n");
 
@@ -538,6 +505,16 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
 
         return;
     }
+
+    cvmf_task_t *task = cvmf_task_init([](cvmf_async_queue_t *, void *ctx){
+        SourceBufferPrivateHelio *helioSB = (SourceBufferPrivateHelio *)ctx;
+        helioSB->writeEnqueuedSample();
+    }, this);
+    enqueue_task(m_asyncQueue, task);
+
+}
+
+void SourceBufferPrivateHelio::writeEnqueuedSample() {
 
     // Pointer to the buffer we can fill with PES packets
     uint8_t *writeBuffer = NULL;
@@ -547,16 +524,16 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
     // rcv_media_stream_write(m_mediaStream, writeBuffer, writeSize);
     if (!rcv_media_stream_buffer(m_mediaStream, &writeBuffer, &totalAvailable)) {
         printf("ERROR SourceBufferPrivateHelio unable to get buffer from pool\n");
-        m_enqueuedSample = helioSample;
+        //m_enqueuedSample = helioSample;
         return;
     }
 
     bufferAvailable = totalAvailable;
 
-    printf("SourceBufferPrivateHelio NEXUS buffer available:%zu next packet:%zu\n", bufferAvailable, helioSample->sizeOfNextPESPacket());
-    while (bufferAvailable >= helioSample->sizeOfNextPESPacket()) {
+    printf("SourceBufferPrivateHelio NEXUS buffer available:%zu next packet:%zu\n", bufferAvailable, m_enqueuedSample->sizeOfNextPESPacket());
+    while (bufferAvailable >= m_enqueuedSample->sizeOfNextPESPacket()) {
         size_t writeSize = 0;
-        if (!helioSample->writeNextPESPacket(&writeBuffer, &writeSize)) {
+        if (!m_enqueuedSample->writeNextPESPacket(&writeBuffer, &writeSize)) {
             printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket BREAK: Should be 0 %zu\n", writeSize);
             break;
         }
@@ -566,9 +543,9 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
     }
 
     // We've got more samples to write, but probably ran out of space.
-    if (helioSample->sizeOfNextPESPacket()) {
-        printf("SourceBufferPrivateHelio::enqueueSample ERROR Data to write in this sample, but no more space in the buffer, m_enqueuedSample%zu\n", helioSample->sizeOfNextPESPacket());
-        m_enqueuedSample = helioSample;
+    if (m_enqueuedSample->sizeOfNextPESPacket()) {
+        printf("SourceBufferPrivateHelio::enqueueSample ERROR Data to write in this sample, but no more space in the buffer, m_enqueuedSample%zu\n", m_enqueuedSample->sizeOfNextPESPacket());
+        // m_enqueuedSample = helioSample;
     } else {
         m_enqueuedSample = nullptr;
     }
@@ -603,6 +580,14 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
         printf("ERROR: SourceBufferPrivateHelio WRITE ERROR\n");
     }
 
+    // if (m_enqueuedSample == nullptr && m_notifyReadyForSample) {
+    //     cvmf_task_t *task = cvmf_task_init([](void *ctx){
+    //         SourceBufferPrivateHelio *helioSB = (SourceBufferPrivateHelio *)ctx;
+    //         helioSB->queueClientNotification();
+    //     }, this);
+    //
+    //     enqueue_task(m_asyncQueue, task);
+    // }
 }
 
 // SourceBuffer calls this method twice before calling the notify method.
@@ -610,10 +595,10 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
 // append done. Make sure the event is fired before returning true here
 // We don't want to block the event from dispatching.
 bool SourceBufferPrivateHelio::isReadyForMoreSamples(AtomicString as) {
-    printf("SourceBufferPrivateHelio isReadyForMoreSamples TRACK:%s %i\n",
-           as.string().utf8().data(), m_writeBufferAvailable);
+    printf("SourceBufferPrivateHelio (%p) isReadyForMoreSamples TRACK:%s %i\n",
+           this, as.string().utf8().data(), m_enqueuedSample == nullptr);
 
-    return m_writeBufferAvailable && !m_enqueuedSample;
+    return !m_enqueuedSample;
 }
 
 void SourceBufferPrivateHelio::setActive(bool active) {
@@ -621,17 +606,30 @@ void SourceBufferPrivateHelio::setActive(bool active) {
     // for this content.
     printf("SourceBufferPrivateHelio setActive:%i\n", active);
 
-    m_engineTaskQueue.enqueueTask([this, active]() {
-        if (active && m_mediaStream) {
-            printf("SourceBufferPrivateHelio creating pipeline\n");
-            m_mediaPipeline = rcv_media_pipeline_init(m_mediaStream,
-                                                      m_mediaPlayer->platformClockController());
-        }
-        // TODO: else rcv_media_pipeline_destroy??
+    // TODO: rcv_media_pipeline_destroy if active == false
+    if (!active || m_mediaPipeline) {
+        printf("WARN: SourceBufferPrivateHelio setActive:%i\n", active);
+        return;
+    }
 
-        // TODO: Why does this need the m_mediaPipeline??
-        m_mediaSource->sourceBufferPrivateActiveStateChanged(this, m_mediaPipeline);
-    });
+    cvmf_task_t *task = cvmf_task_init([](cvmf_async_queue_t *, void *ctx) {
+        SourceBufferPrivateHelio *helioSB = (SourceBufferPrivateHelio *)ctx;
+        helioSB->preparePipeline();
+    }, this);
+
+    enqueue_task(m_asyncQueue, task);
+    //preparePipeline();
+}
+
+void SourceBufferPrivateHelio::preparePipeline() {
+    if (m_mediaStream) {
+        printf("SourceBufferPrivateHelio creating pipeline\n");
+        m_mediaPipeline = rcv_media_pipeline_init(m_mediaStream,
+                                                  m_mediaPlayer->platformClockController());
+    }
+
+    // TODO: Why does this need the m_mediaPipeline??
+    m_mediaSource->sourceBufferPrivateActiveStateChanged(this, m_mediaPipeline);
 }
 
 void SourceBufferPrivateHelio::notifyClientWhenReadyForMoreSamples(AtomicString trackId) {
@@ -639,42 +637,90 @@ void SourceBufferPrivateHelio::notifyClientWhenReadyForMoreSamples(AtomicString 
     m_notifyReadyForSample = true;
 }
 
-//void SourceBufferPrivateHelio::writeBufferAvailable() {
-//    //m_readyForMoreSamples = true;
-//}
-
 // Called by the MediaSource as soon as all it's buffers become active
 // and the pipelines are connected.
 void SourceBufferPrivateHelio::startStream() {
     printf("SourceBufferPrivateHelio::startStream()\n");
     // TODO: at this point we MAY be ready for samples, but we wait until
     // the stream's data ready callback occurs.
-    m_engineTaskQueue.enqueueTask([this]() {
-        rcv_media_pipeline_start_stream(m_mediaPipeline, m_mediaStream);
-    });
+
+    struct stream_init {
+        rcv_media_stream_t *mediaStream;
+        rcv_media_pipeline_t *mediaPipeline;
+    };
+    struct stream_init *sbStream = malloc(sizeof(struct stream_init));
+    sbStream->mediaStream = m_mediaStream;
+    sbStream->mediaPipeline = m_mediaPipeline;
+
+    cvmf_task_t *task = cvmf_task_init([](cvmf_async_queue_t *, void *ctx) {
+        struct stream_init *init = (struct stream_init *)ctx;
+        rcv_media_pipeline_start_stream(init->mediaPipeline,
+                                        init->mediaStream);
+        free(init);
+    }, sbStream);
+
+    enqueue_task(m_asyncQueue, task);
 
 }
 
-// callback from rcvmf
+void SourceBufferPrivateHelio::queueClientNotification() {
+    m_notifyReadyForSample = false;
+    printf("SourceBufferPrivateHelio::platformBufferAvailable(), m_client->sourceBufferPrivateDidBecomeReadyForMoreSamples\n");
+    m_client->sourceBufferPrivateDidBecomeReadyForMoreSamples(this, m_trackId);
+}
+
+// callback from rcvmf, do NOT do a lot of work in this call.
 void SourceBufferPrivateHelio::platformBufferAvailable() {
-    // TODO: Do NOT do a lot of work in this call!
     printf("SourceBufferPrivateHelio::platformBufferAvailable()\n");
-    if (m_enqueuedSample != NULL) {
+    if (m_enqueuedSample != nullptr) {
         printf("SourceBufferPrivateHelio::platformBufferAvailable(), enqueuing previous sample\n");
-        // TODO: Which thread does enqueueSample get called on?
-        callOnMainThread([this](){
-            enqueueSample(m_enqueuedSample, m_trackId);
-        });
+
+        cvmf_task_t *task = cvmf_task_init([](cvmf_async_queue_t *, void *ctx){
+            SourceBufferPrivateHelio *helioSB = (SourceBufferPrivateHelio *)ctx;
+            helioSB->writeEnqueuedSample();
+        }, this);
+
+        enqueue_task(m_asyncQueue, task);
+
         return;
     }
-    m_writeBufferAvailable = true;
-    if (m_notifyReadyForSample && m_writeBufferAvailable) {
-        callOnMainThread([this](){
-            m_notifyReadyForSample = false;
-            // sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) = 0;
-            m_client->sourceBufferPrivateDidBecomeReadyForMoreSamples(this, m_trackId);
-        });
+
+    if (m_notifyReadyForSample) {
+        cvmf_task_t *task = cvmf_task_init([](cvmf_async_queue_t *, void *ctx){
+            SourceBufferPrivateHelio *helioSB = (SourceBufferPrivateHelio *)ctx;
+            helioSB->queueClientNotification();
+        }, this);
+
+        enqueue_task(m_asyncQueue, task);
     }
+
+
+    // } else if (m_notifyReadyForSample) {
+    //     m_notifyReadyForSample = false;
+    //
+    //     // TODO: Check if there's a difference between this and our async queue
+    //     m_notifyQueue.enqueueTask([this]{
+    //         // TODO: Try calling on mainThread..
+    //         printf("SourceBufferPrivateHelio::platformBufferAvailable(), m_client->sourceBufferPrivateDidBecomeReadyForMoreSamples\n");
+    //         // This is a couple hundred ms call, we're using the platform engine
+    //         // thread here.
+    //         struct timeval tv;
+    //         gettimeofday(&tv, NULL);
+    //
+    //         unsigned long long start =
+    //           (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    //
+    //         m_client->sourceBufferPrivateDidBecomeReadyForMoreSamples(this, m_trackId);
+    //
+    //         gettimeofday(&tv, NULL);
+    //
+    //         unsigned long long end =
+    //           (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    //
+    //         printf("SourceBufferPrivateHelio sourceBufferPrivateDidBecomeReadyForMoreSamples TOTAL: %llu\n", end - start);
+    //     });
+    //
+    // }
 }
 
 }

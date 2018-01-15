@@ -25,18 +25,20 @@
 
 namespace WebCore {
 
-pthread_t time_update_thread_id;
-
-
-static void *timeupdate_monitor(void *mediaPlayer) {
-   while (true) {
-       // printf("timeupdate_thread sleep 0.250\n");
-       callOnMainThread([mediaPlayer]{
-           static_cast<MediaPlayer*>(mediaPlayer)->timeChanged();
-       });
-       WTF::sleep(0.250);
-   }
-}
+// pthread_t time_update_thread_id;
+//
+//
+// // TODO: check if this is actually needed, or if HTMLMediaElement does this
+// // for us.
+// static void *timeupdate_monitor(void *mediaPlayer) {
+//    while (true) {
+//        // printf("timeupdate_thread sleep 0.250\n");
+//        callOnMainThread([mediaPlayer]{
+//            static_cast<MediaPlayer*>(mediaPlayer)->timeChanged();
+//        });
+//        WTF::sleep(0.250);
+//    }
+// }
 
 
 pthread_t playready_init_thread_id;
@@ -123,7 +125,19 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
       parameters.isMediaStream);
 
   if (parameters.isMediaSource) {
+      // https://w3c.github.io/media-source/byte-stream-format-registry.html
+      // make this case insensitive ...
+      // if (parameters.type != "viedo/mp4" && parameters.type != "audio/mp4") {
+      //
+      // }
+      // TODO: Support video/mp2t & audio/mp2t
 
+      /**
+       * Sometimes checking these in an engine requires allocation of a decoder,
+       * need to implement in the engine.
+       * may mean reporting maybe here and then doing the actual check
+       * the sourceBuffer constructor. Double check the spec here.
+       */
       // TODO: Check these..
       if (!parameters.codecs.isEmpty() && parameters.codecs != "ec-3") {
           printf("MediaPlayerPrivateHelio::MediaPlayer::IsSupported parameters.isMediaSource and codecs\n");
@@ -149,7 +163,7 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
 
 bool MediaPlayerPrivateHelio::_supportsKeySystem(const String& keySystem, const String& mimeType) {
     printf("MediaPlayerPrivateHelio _supportsKeySystem(keySystem:%s mimeType:%s)\n", keySystem.utf8().data(), mimeType.utf8().data());
-    return keySystem == "com.microsoft.playready";
+    return keySystem == "com.microsoft.playready" || keySystem == "webkit-org.w3.clearkey";
 }
 
 MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
@@ -161,10 +175,10 @@ MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
     , m_lastReportedDuration(MediaTime::zeroTime())
     // , m_prSessionLock()
     , m_emeQueue()
-    , m_emeDecrypt() {
+    , m_emeDecrypt()
+    , m_lastReportedTime(0) {
         printf("MediaPlayerPrivateHelio constructor\n");
-        //m_initData = NULL;
-        //m_initDataLength = 0;
+        m_timeUpdateQueue = NULL;
 #if USE(COORDINATED_GRAPHICS_THREADED)
         m_platformLayerProxy = adoptRef(new TextureMapperPlatformLayerProxy());
 #endif
@@ -185,7 +199,7 @@ MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
     m_queueMutex = PTHREAD_MUTEX_INITIALIZER;
 
     // TODO: Start PlayReady...
-    pthread_create(&playready_init_thread_id, NULL, playready_start, this);
+    // pthread_create(&playready_init_thread_id, NULL, playready_start, this);
 
     // TOOD: this needs a thread..
     // m_emeTasks.enqueueTask([this] {
@@ -204,17 +218,53 @@ MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
 
 MediaPlayerPrivateHelio::~MediaPlayerPrivateHelio() {
     printf("MediaPlayerPrivateHelio destructor\n");
-    // TODO: m_pssh & the thread stuff
-    // if (m_initData != NULL) {
-    //     free(m_initData);
-    // }
-    // m_emeQueue.close();
-    // m_emeDecrypt.close();
+    if (m_timeUpdateQueue) {
+        cvmf_queue_destroy(&m_timeUpdateQueue);
+    }
+    // To destroy this, you have to close down all the connections first.
+    if (m_platformClockController) {
+        // TODO: Destory m_platformClockController
+    }
+#if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) && USE(PLAYREADY)
+    if (m_pssh) {
+        rcv_destroy_pssh(&m_pssh);
+    }
+#endif
+
+    // TODO: This stuff needs to be static to the player..
+    //
+    //     std::queue<std::function<void(PlayreadySession *)>> m_emeQueue;
+    //     std::queue<std::function<void(PlayreadySession *)>> m_emeDecrypt;
+    //     pthread_cond_t m_queueCond;
+    //     pthread_mutex_t m_queueMutex;
+    //
+    //
+
 }
 
 void MediaPlayerPrivateHelio::load(const String& url) {
     printf("MediaPlayerPrivateHelio load url%s\n", url.utf8().data());
 }
+
+void helio_player_timeupdate(cvmf_async_queue_t *queue, void *context) {
+    printf("helio_player_timeupdate\n");
+    callOnMainThread([context]{
+        static_cast<MediaPlayerPrivateHelio*>(context)->timerFired();
+    });
+
+    enqueue_task(queue, cvmf_task_init(helio_player_timeupdate, context));
+
+    WTF::sleep(0.250);
+}
+
+void MediaPlayerPrivateHelio::timerFired() {
+    if (m_lastReportedTime == currentTime()) {
+        return;
+    }
+    m_lastReportedTime = currentTime();
+    m_mediaPlayer->timeChanged();
+}
+
 
 void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* client) {
     printf("MediaPlayerPrivateHelio load url:%s, client\n", url.utf8().data());
@@ -226,7 +276,10 @@ void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* 
 
     m_platformClockController = rcv_media_stream_clock_init();
 
-    pthread_create(&time_update_thread_id, NULL, timeupdate_monitor, m_mediaPlayer);
+    // m_timeUpdateQueue = cvmf_queue_init();
+
+    // enqueue_task(m_timeUpdateQueue, cvmf_task_init(helio_player_timeupdate, this));
+    // pthread_create(&time_update_thread_id, NULL, timeupdate_monitor, m_mediaPlayer);
 }
 
 void MediaPlayerPrivateHelio::cancelLoad() {
@@ -362,7 +415,10 @@ bool MediaPlayerPrivateHelio::nextDecryptionSessionTask() {
     }
     if (m_prSession->ready() && !m_emeDecrypt.empty()) {
         printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask m_emeDecrypt task\n");
-        m_emeDecrypt.front()(m_prSession.get());
+        auto fn = m_emeDecrypt.front();
+        pthread_mutex_unlock(&m_queueMutex);
+        fn(m_prSession.get());
+        pthread_mutex_lock(&m_queueMutex);
         m_emeDecrypt.pop();
     }
     printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask pthread_mutex_unlock\n");

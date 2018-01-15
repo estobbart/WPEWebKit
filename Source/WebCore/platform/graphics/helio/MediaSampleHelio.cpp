@@ -60,14 +60,11 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer,
         if (sample) {
             // TODO: Seem to be getting lipsync issues
             // total hack.. needs to be moved/removed
-            // if (m_hasAudio && m_ptsAccumulation == 0) {
-            //     m_ptsAccumulation += 35000; // .38 ms - 3 frames
-            // }
-            uint64_t pts = (m_ptsAccumulation
-              + rcv_tfdt_base_media_decode_time(tfdt)
-              + round(m_timestampOffset.toFloat() / m_timescale));
-            // TODO: Need to adjust by this timestamp
-//            printf("TODO:: MediaSampleHelio::writeNextPESPacket m_timestampOffset.toFloat() == %f Current PTS == %lld\n", m_timestampOffset.toFloat(), pts);
+            if (m_hasAudio && m_ptsAccumulation == 0) {
+                m_ptsAccumulation += 22000; // .38 ms - 3 frames
+            }
+            // TODO: Need to properly handle rollovers
+            uint64_t pts = m_ptsAccumulation + rcv_tfdt_base_media_decode_time(tfdt) + m_timestampOffset;
             uint32_t sampleSize = rcv_trun_sample_size(sample);
             uint32_t headerSize = 0;
             if (m_hasAudio) {
@@ -288,7 +285,7 @@ MediaTime MediaSampleHelio::presentationTime() const {
             m_presentationTime = MediaTime::createWithDouble(pts);
         }
     }
-    return m_presentationTime + m_timestampOffset;
+    return m_presentationTime + MediaTime(m_timestampOffset, m_timescale);
 }
 
 MediaTime MediaSampleHelio::decodeTime() const {
@@ -301,7 +298,7 @@ MediaTime MediaSampleHelio::decodeTime() const {
             m_decodeTime = MediaTime::createWithDouble(dts);
         }
     }
-    return m_decodeTime + m_timestampOffset;
+    return m_decodeTime + MediaTime(m_timestampOffset, m_timescale);
 }
 
 MediaTime MediaSampleHelio::duration() const {
@@ -337,7 +334,7 @@ FloatSize MediaSampleHelio::presentationSize() const {
 
 void MediaSampleHelio::offsetTimestampsBy(const MediaTime &mediaTime) {
     printf("MediaSampleHelio::offsetTimestampsBy %f\n", mediaTime.toFloat());
-    m_timestampOffset = mediaTime;
+    m_timestampOffset = round(mediaTime.toDouble() * m_timescale);
 }
 
 // TODO: It's not clear when/why this would be called.

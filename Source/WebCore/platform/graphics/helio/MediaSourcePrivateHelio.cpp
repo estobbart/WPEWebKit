@@ -26,8 +26,8 @@ MediaSourcePrivateHelio::MediaSourcePrivateHelio(MediaPlayerPrivateHelio* helioP
     // TODO: IS this the right ready state?
   , m_readyState(MediaPlayer::HaveNothing) {
     printf("MediaSourcePrivateHelio constructor\n");
-      
-   m_mediaPlatform = rcv_media_platform_init();
+    // TODO: Clock this..
+    m_mediaPlatform = rcv_media_platform_init();
 }
 
 MediaSourcePrivateHelio::~MediaSourcePrivateHelio() {
@@ -101,7 +101,7 @@ void MediaSourcePrivateHelio::unmarkEndOfStream() {
  * Indicates the current state of the MediaSource object. When the MediaSource
  * is created readyState must be set to "closed".
  */
-// 
+//
 MediaPlayer::ReadyState MediaSourcePrivateHelio::readyState() const {
     printf("MediaSourcePrivateHelio readyState\n");
     return m_readyState;
@@ -123,7 +123,7 @@ void MediaSourcePrivateHelio::seekCompleted() {
 void MediaSourcePrivateHelio::sourceBufferPrivateActiveStateChanged(SourceBufferPrivateHelio *sourceBuffer,
                                                                     rcv_media_pipeline_t *mediaPipeline) {
     printf("MediaSourcePrivateHelio sourceBufferPrivateActiveStateChanged\n");
-    
+
     m_sourceBuffers.set(sourceBuffer, mediaPipeline);
 
     // TODO: This can take up ~100ms, especially when calling startStream
@@ -140,11 +140,11 @@ void MediaSourcePrivateHelio::sourceBufferPrivateActiveStateChanged(SourceBuffer
     }
 
     activePipelines[m_sourceBuffers.size()] = NULL;
-    
+
     if (allCreatedAreActive) {
-        
+
         // callOnMainThread...
-        
+
         rcv_media_platform_connect_pipelines(m_mediaPlatform, activePipelines);
         printf("MediaSourcePrivateHelio .. rcv_media_platform_connect_pipelines\n");
         for (auto sourceBuffer : m_sourceBuffers.keys()) {

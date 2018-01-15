@@ -44,6 +44,14 @@
 #include <WebCore/ResourceLoader.h>
 #include <WebCore/SubresourceLoader.h>
 
+#include <sys/time.h> // gettimeofday
+
+uint64_t now() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+}
+
 using namespace WebCore;
 
 #define RELEASE_LOG_IF_ALLOWED(fmt, ...) RELEASE_LOG_IF(isAlwaysOnLoggingAllowed(), Network, "%p - WebResourceLoader::" fmt, this, ##__VA_ARGS__)
@@ -82,7 +90,7 @@ void WebResourceLoader::detachFromCoreLoader()
 
 void WebResourceLoader::willSendRequest(ResourceRequest&& proposedRequest, ResourceResponse&& redirectResponse)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::willSendRequest to '%s'", proposedRequest.url().string().latin1().data());
+    LOG(Network, "(WebProcess) HELIOMETRIC: %llu WebResourceLoader::willSendRequest to '%s'", now(), proposedRequest.url().string().latin1().data());
     RELEASE_LOG_IF_ALLOWED("willSendRequest: (pageID = %" PRIu64 ", frameID = %" PRIu64 ", resourceID = %" PRIu64 ")", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID);
 
     RefPtr<WebResourceLoader> protectedThis(this);
@@ -127,7 +135,7 @@ void WebResourceLoader::didReceiveResponse(const ResourceResponse& response, boo
     if (shoudCallCoreLoaderDidReceiveResponse)
         m_coreLoader->didReceiveResponse(response);
 
-    // If m_coreLoader becomes null as a result of the didReceiveResponse callback, we can't use the send function(). 
+    // If m_coreLoader becomes null as a result of the didReceiveResponse callback, we can't use the send function().
     if (!m_coreLoader)
         return;
 
@@ -155,7 +163,7 @@ void WebResourceLoader::didReceiveData(const IPC::DataReference& data, int64_t e
 
 void WebResourceLoader::didFinishResourceLoad(double finishTime)
 {
-    LOG(Network, "(WebProcess) WebResourceLoader::didFinishResourceLoad for '%s'", m_coreLoader->url().string().latin1().data());
+    LOG(Network, "(WebProcess) HELIOMETRIC: %llu WebResourceLoader::didFinishResourceLoad for '%s'", now(), m_coreLoader->url().string().latin1().data());
     RELEASE_LOG_IF_ALLOWED("didFinishResourceLoad: (pageID = %" PRIu64 ", frameID = %" PRIu64 ", resourceID = %" PRIu64 ")", m_trackingParameters.pageID, m_trackingParameters.frameID, m_trackingParameters.resourceID);
 
 #if USE(QUICK_LOOK)

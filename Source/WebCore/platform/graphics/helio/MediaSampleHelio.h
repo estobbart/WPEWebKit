@@ -174,7 +174,7 @@ private:
       : m_presentationTime()
       , m_decodeTime()
       , m_duration()
-      , m_timestampOffset(MediaTime::zeroTime()) {
+      , m_timestampOffset(0) {
         m_sample = root;
         m_codecConf = codecConf; // TODO: WTF::move??
         m_cursor = rcv_cursor_init();
@@ -292,7 +292,7 @@ private:
 
     RefPtr<HelioCodecConfiguration> m_codecConf;
 
-    MediaTime m_timestampOffset;
+    int64_t m_timestampOffset;
 
     // Cached values.
     // TODO: Capture these values when a non-display copy is needed.

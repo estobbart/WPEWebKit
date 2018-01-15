@@ -6,10 +6,11 @@
 
 #include "rcvmf_isobmff.h"
 #include "rcvmf_media_pipeline.h"
-
-#include "GenericTaskQueue.h"
+#include "async_queue.h"
 
 #include <wtf/WeakPtr.h>
+
+#include <GenericTaskQueue.h>
 
 
 //#include "helio.h"
@@ -106,6 +107,13 @@ public:
     // callback from rcvmf
     void platformBufferAvailable();
 
+    // called form background threads
+    void writeEnqueuedSample();
+
+    void preparePipeline();
+
+    void queueClientNotification();
+
 private:
 
     explicit SourceBufferPrivateHelio(MediaPlayerPrivateHelio *,
@@ -136,33 +144,33 @@ private:
     // duration, cts & dts.
     uint32_t m_timescale;
 
-    bool m_writeBufferAvailable;
-
     // m_mediaStream is data in to be processed
     rcv_media_stream_t *m_mediaStream;
     // m_mediaPipeline is decoder resources and read off the m_mediaStream
     // and get synchronized using the clock.
     rcv_media_pipeline_t *m_mediaPipeline;
 
-    bool m_isAudio;
-    bool m_isVideo;
-    bool m_encryptedSamples;
-
-    // TODO: Do we need to keep this?
-    rcv_node_t *m_isobmffInitSegmentRoot;
-
     RefPtr<HelioCodecConfiguration> m_codecConfiguration;
-    // When an enqueued sample doesn't fit
-    // in a buffer, it get's captured finishes
-    // processing once additional space frees up.
+
+    // There are a few uses of this variable.. it determines if we're ready
+    // for more samples or not, we only ever keep one sample queued up.
+    // It could be queued for 2 reasons, 1. It's encrypted and we're waiting
+    // for the decryption task. 2. We ran out of space in the decoder buffer,
+    // and are waiting for a callback.
     // TODO: Cange this to a RefPtr
     RefPtr<MediaSampleHelio> m_enqueuedSample;
 
-    GenericTaskQueue<Timer> m_engineTaskQueue;
-
-    // TODO: Capture a notify flag.
+    // If the SourceBuffer attempts to enqueue a sample while we already have
+    // one, we return that we can't accept more. It then calls us to notify
+    // back the SourceBuffer once we're ready. Ready would mean we've written
+    // the entire enqueue'd sample, and the decoder has signaled the space
+    // in the buffer is available.
     bool m_notifyReadyForSample;
+    GenericTaskQueue<Timer> m_notifyQueue;
 
+    cvmf_async_queue_t *m_asyncQueue;
+
+    // The current track ID's we're handling in this SourceBuffer
     AtomicString m_trackId;
 
 };
