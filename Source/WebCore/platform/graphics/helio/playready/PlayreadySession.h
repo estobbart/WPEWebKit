@@ -34,11 +34,15 @@
 #include <wtf/Forward.h>
 #include <wtf/text/WTFString.h>
 
+#include <pthread.h>
+#include <queue>
+
 namespace WebCore {
 
 class PlayreadySession {
 
-private:
+public:
+
     enum KeyState {
         // Has been initialized.
         KEY_INIT = 0,
@@ -52,9 +56,28 @@ private:
         KEY_CLOSED = 4
     };
 
-public:
-    PlayreadySession();
-    ~PlayreadySession();
+    enum TaskPriority {
+        KEY = 1,
+        DECRYPT = 2
+    };
+
+    // TODO: Need to split this up.. a decode task needs a specific key id?
+    // TODO: when a MediaPlayer tears down it needs to be able to destroy a key?
+
+    // TODO: These tasks need to know if decryption is being done or not
+    // maybe pass in a state flag or something?
+
+    // Expect delays the first time this is called, all follow up calls should
+    // occur faster once the Drm_Initialize happens.
+    static void playreadyTask(TaskPriority priority, std::function< void (PlayreadySession*) > task);
+
+    // The functions below will lock/unlock the playready session
+    // They can be called in a task handler callback
+    // The taskQueue has it's own mutex so it's safe to request additional
+    // tasks within a task.
+
+    // TODO: MAy need to keep a map of keys, and let the decryption tasks
+    // specify which key they need, to be able to do license rotation
 
     /**
      * initData is the data in the PSSH box without the header, etc (see librcvmf pssh)
@@ -65,21 +88,30 @@ public:
      * errorCode and systemCode are sort of broken, don't rely on them here.
      */
     RefPtr<Uint8Array> playreadyGenerateKeyRequest(Uint8Array* initData, const String& customData, String& destinationURL, unsigned short& errorCode, uint32_t& systemCode);
+
     bool playreadyProcessKey(Uint8Array* key, unsigned short& errorCode, uint32_t& systemCode);
 
-    bool keyRequested() const { return m_eKeyState == KEY_PENDING; }
-    bool ready() const { return m_eKeyState == KEY_READY; }
-    bool init() const { return m_eKeyState == KEY_INIT; }
     int processPayload(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize);
 
     // Helper for PlayreadySession clients.
-    Lock& mutex() { return m_prSessionMutex; }
     const String& sessionId() { return m_sessionId; }
+
+    void resetSession();
+
+    // TODO: hide this..
+    PlayreadySession();
 
 protected:
     RefPtr<ArrayBuffer> m_key;
+    void _drmSessionInit();
+    bool _nextTask();
 
 private:
+    ~PlayreadySession();
+
+    // static std::unique_ptr<PlayreadySession> prSession;
+    static PlayreadySession *gPlayreadySession;
+
     static DRM_RESULT DRM_CALL _PolicyCallback(const DRM_VOID* f_pvOutputLevelsData, DRM_POLICY_CALLBACK_TYPE f_dwCallbackType, const DRM_VOID* f_pv);
 
     DRM_APP_CONTEXT* m_poAppContext { nullptr };
@@ -94,8 +126,13 @@ private:
     DRM_CHAR m_rgchSessionID[CCH_BASE64_EQUIV(SIZEOF(DRM_ID)) + 1];
     DRM_BOOL m_fCommit;
 
-    Lock m_prSessionMutex;
     String m_sessionId;
+
+    pthread_t pr_thread_id;
+    static std::queue<std::function<void(PlayreadySession *)>> prTaskQueue;
+    static std::queue<std::function<void(PlayreadySession *)>> prDecryptQueue;
+    static pthread_cond_t queueCond;
+    static pthread_mutex_t queueMutex;
 };
 
 }

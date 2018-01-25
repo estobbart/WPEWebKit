@@ -1491,7 +1491,6 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
 
     // 3.5.8 Coded Frame Processing
     // http://www.w3.org/TR/media-source/#sourcebuffer-coded-frame-processing
-
     // When complete coded frames have been parsed by the segment parser loop then the following steps
     // are run:
     // 1. For each coded frame in the media segment run the following steps:
@@ -1553,7 +1552,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         if (it == m_trackBufferMap.end()) {
             // The client managed to append a sample with a trackID not present in the initialization
             // segment. This would be a good place to post an message to the developer console.
-            printf("didDropSample due to not finding trackID:`%s` in  m_trackBufferMap\n", trackID.string().utf8().data());
+            printf("ERROR didDropSample due to not finding trackID:`%s` in  m_trackBufferMap\n", trackID.string().utf8().data());
             didDropSample();
             return;
         }
@@ -1568,6 +1567,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         if (trackBuffer.lastDecodeTimestamp.isValid() && (decodeTimestamp < trackBuffer.lastDecodeTimestamp
             || abs(decodeTimestamp - trackBuffer.lastDecodeTimestamp) > (trackBuffer.lastFrameDuration * 2))) {
 
+            printf("ERROR SourceBuffer 1.6\n");
             // 1.6.1:
             if (m_mode == AppendMode::Segments) {
                 // ↳ If mode equals "segments":
@@ -1596,6 +1596,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         }
 
         if (m_mode == AppendMode::Sequence) {
+            printf("ERROR sample.setTimestamps(presentationTimestamp, decodeTimestamp);\n");
             // Use the generated timestamps instead of the sample's timestamps.
             sample.setTimestamps(presentationTimestamp, decodeTimestamp);
         } else if (m_timestampOffset) {
@@ -1614,7 +1615,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         // the next coded frame.
         if (presentationTimestamp < m_appendWindowStart || frameEndTimestamp > m_appendWindowEnd) {
             trackBuffer.needRandomAccessFlag = true;
-            printf("trackBuffer.needRandomAccessFlag = true;\n");
+            printf("ERROR trackBuffer.needRandomAccessFlag = true;\n");
             didDropSample();
             return;
         }
@@ -1637,7 +1638,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
             // 1.11.1 If the coded frame is not a random access point, then drop the coded frame and jump
             // to the top of the loop to start processing the next coded frame.
             if (!sample.isSync()) {
-                printf("!sample.isSync()\n");
+                printf("ERROR !sample.isSync()\n");
                 didDropSample();
                 return;
             }
@@ -1657,6 +1658,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
         // falls within the presentation interval of a coded frame in track buffer, then run the
         // following steps:
         if (trackBuffer.lastDecodeTimestamp.isInvalid()) {
+            printf("ERROR trackBuffer.lastDecodeTimestamp.isInvalid()\n");
             auto iter = trackBuffer.samples.presentationOrder().findSampleContainingPresentationTime(presentationTimestamp);
             if (iter != trackBuffer.samples.presentationOrder().end()) {
                 // 1.14.1 Let overlapped frame be the coded frame in track buffer that matches the condition above.
@@ -1769,11 +1771,22 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Med
 
         // Otherwise:
         // Add the coded frame with the presentation timestamp, decode timestamp, and frame duration to the track buffer.
+        // if (hasAudio()) {
+        //     printf("ERROR SourceBuffer sourceBufferPrivateDidReceiveSample trackBuffer.samples.addSample decodeTime:%f\n", sample.decodeTime().toDouble());
+        // }
         trackBuffer.samples.addSample(sample);
 
-        if (trackBuffer.lastEnqueuedDecodeEndTime.isInvalid() || decodeTimestamp >= trackBuffer.lastEnqueuedDecodeEndTime) {
+        if (trackBuffer.lastEnqueuedDecodeEndTime.isInvalid() || decodeTimestamp >= (trackBuffer.lastEnqueuedDecodeEndTime - microsecond)) {
             DecodeOrderSampleMap::KeyType decodeKey(decodeTimestamp, presentationTimestamp);
+            if (hasAudio()) {
+                // printf("ERROR SourceBuffer sourceBufferPrivateDidReceiveSample trackBuffer.decodeQueue.insert decodeTime:%f\n", sample.decodeTime().toDouble());
+            }
             trackBuffer.decodeQueue.insert(DecodeOrderSampleMap::MapType::value_type(decodeKey, &sample));
+        } else {
+            printf("ERROR *****************************************************************************\n");
+            printf("ERROR SourceBuffer sourceBufferPrivateDidReceiveSample DID NOT INSERT SAMPLE!:%f %f\n",
+                   decodeTimestamp.toDouble(), trackBuffer.lastEnqueuedDecodeEndTime.toDouble());
+            printf("ERROR *****************************************************************************\n");
         }
 
         // 1.18 Set last decode timestamp for track buffer to decode timestamp.
@@ -2014,13 +2027,12 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
         // new current time without triggering this early return.
         // FIXME(135867): Make this gap detection logic less arbitrary.
         MediaTime oneSecond(1, 1);
-        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond) {
-            printf("ERROR:ignoring... trackID:%s  trackBuffer.lastEnqueuedDecodeEndTime.isValid() == %i && sample->decodeTime(%f) - trackBuffer.lastEnqueuedDecodeEndTime(%f) > oneSecond == %i\n",
-                   trackID.string().utf8().data(),
-                   trackBuffer.lastEnqueuedDecodeEndTime.isValid(),
-                   sample->decodeTime().toFloat(),
-                   trackBuffer.lastEnqueuedDecodeEndTime.toFloat(),
-                   sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime > oneSecond);
+        MediaTime delta = sample->decodeTime() - trackBuffer.lastEnqueuedDecodeEndTime;
+        if (trackBuffer.lastEnqueuedDecodeEndTime.isValid() && delta > oneSecond) {
+            printf("ERROR SourceBuffer::provideMediaData sample->decodeTime(%f) - trackBuffer.lastEnqueuedDecodeEndTime(%f) > oneSecond: delta == %f\n",
+                   sample->decodeTime().toDouble(),
+                   trackBuffer.lastEnqueuedDecodeEndTime.toDouble(),
+                   delta.toDouble());
             //break;
         }
 

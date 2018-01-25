@@ -484,8 +484,14 @@ void SourceBufferPrivateHelio::enqueueSample(PassRefPtr<MediaSample> mediaSample
 
     m_enqueuedSample = static_cast<MediaSampleHelio *>(mediaSample.get());
 
+    // m_trackDecription doesn't work well here..
+    // if (m_enqueuedSample->isAudio()) {
+    //     printf("ERROR SourceBufferPrivate enqueueSample with decodeTime:%f\n", m_enqueuedSample->decodeTime().toDouble());
+    // }
+
     if (m_enqueuedSample->isEncrypted()) {
-        m_mediaPlayer->sourceBufferRequiresDecryptionEngine([this](PlayreadySession *prSession) {
+
+        PlayreadySession::playreadyTask(2, [this](PlayreadySession *prSession){
             printf("m_mediaPlayer->sourceBufferRequiresDecryptionEngine task START\n");
 
             m_enqueuedSample->decryptBuffer([prSession](const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize) -> int {
@@ -530,11 +536,11 @@ void SourceBufferPrivateHelio::writeEnqueuedSample() {
 
     bufferAvailable = totalAvailable;
 
-    printf("SourceBufferPrivateHelio NEXUS buffer available:%zu next packet:%zu\n", bufferAvailable, m_enqueuedSample->sizeOfNextPESPacket());
+    // printf("SourceBufferPrivateHelio NEXUS buffer available:%zu next packet:%zu\n", bufferAvailable, m_enqueuedSample->sizeOfNextPESPacket());
     while (bufferAvailable >= m_enqueuedSample->sizeOfNextPESPacket()) {
         size_t writeSize = 0;
         if (!m_enqueuedSample->writeNextPESPacket(&writeBuffer, &writeSize)) {
-            printf("SourceBufferPrivateHelio::enqueueSample writeNextPESPacket BREAK: Should be 0 %zu\n", writeSize);
+            // printf("SourceBufferPrivateHelio::enqueueSample loop break writeNextPESPacket writeSize: %zu\n", writeSize);
             break;
         }
         bufferAvailable -= writeSize;
@@ -544,7 +550,7 @@ void SourceBufferPrivateHelio::writeEnqueuedSample() {
 
     // We've got more samples to write, but probably ran out of space.
     if (m_enqueuedSample->sizeOfNextPESPacket()) {
-        printf("SourceBufferPrivateHelio::enqueueSample ERROR Data to write in this sample, but no more space in the buffer, m_enqueuedSample%zu\n", m_enqueuedSample->sizeOfNextPESPacket());
+        printf("SourceBufferPrivateHelio::enqueueSample WARN Data to write in this sample, but no more space in the buffer, m_enqueuedSample->sizeOfNextPacket(): %zu\n", m_enqueuedSample->sizeOfNextPESPacket());
         // m_enqueuedSample = helioSample;
     } else {
         m_enqueuedSample = nullptr;
@@ -560,8 +566,9 @@ void SourceBufferPrivateHelio::writeEnqueuedSample() {
 
     //printf("SourceBufferPrivateHelio will write.. writeBuffer:%p\n", writeBuffer);
 
+    // This check/print exists in rcvmf
     if (totalAvailable == bufferAvailable) {
-        printf("SourceBufferPrivateHelio ERROR NO DATA WRITTEN TO THE BUFFER\n");
+        printf("SourceBufferPrivateHelio WARN NO DATA WRITTEN TO THE BUFFER\n");
     }
 
     // TODO: If the write is zero (the buffer is at the tail end and
@@ -575,7 +582,7 @@ void SourceBufferPrivateHelio::writeEnqueuedSample() {
     // ideally the engine should wait to invoke the callback
     // and should be fixed in the engine layer.
     if (rcv_media_stream_write(m_mediaStream, totalAvailable - bufferAvailable)) {
-        printf("SourceBufferPrivateHelio WRITE SUCCESS\n");
+        // printf("SourceBufferPrivateHelio WRITE SUCCESS\n");
     } else {
         printf("ERROR: SourceBufferPrivateHelio WRITE ERROR\n");
     }
@@ -673,6 +680,11 @@ void SourceBufferPrivateHelio::queueClientNotification() {
 void SourceBufferPrivateHelio::platformBufferAvailable() {
     printf("SourceBufferPrivateHelio::platformBufferAvailable()\n");
     if (m_enqueuedSample != nullptr) {
+        // If we've enqueued it, but it's encrypted means it already has a pending task..
+        if (m_enqueuedSample->isEncrypted()) {
+            return;
+        }
+
         printf("SourceBufferPrivateHelio::platformBufferAvailable(), enqueuing previous sample\n");
 
         cvmf_task_t *task = cvmf_task_init([](cvmf_async_queue_t *, void *ctx){

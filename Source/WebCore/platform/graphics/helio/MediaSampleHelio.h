@@ -148,26 +148,24 @@ public:
      * If the sample cursor is exhausted, no data will be written to the buffer
      * and the return value will be false.
      * The size_t* arg is optional by passing NULL.
-     *
-     * TODO: Move the decrypt function out of here..
      */
     bool writeNextPESPacket(uint8_t **buffer, size_t *size);
-
 
     bool isEncrypted() const;
 
     bool decryptBuffer(std::function<int(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize)> decrypt);
 
-    /**
-     * TODO: This will eventually be needed when we need to decrypt the content
-     */
-    void sampleBuffer(uint8_t **buffer, size_t *size);
 //    void * box(char * fourcc);
 
     // TODO: Why was this private?
     AtomicString trackID() const override {
         return m_id;
     }
+
+    // TODO: Do these need to be public?
+    MediaTime decodeTime() const override;
+
+    bool isAudio() const { return m_hasAudio; }
 
 private:
     MediaSampleHelio(rcv_node_t *root, uint32_t timescale, RefPtr<HelioCodecConfiguration>& codecConf)
@@ -194,30 +192,26 @@ private:
         m_hasVideo = m_codecConf->codecType() == HelioCodecTypeVideo;
         m_hasAudio = m_codecConf->codecType() == HelioCodecTypeAudio;
 
-          // This is only in the init segment
-//        box = rcv_node_child(m_sample, "hdlr");
-//        if (box) {
-//            rcv_hdlr_box_t *hdlr = RCV_HDLR_BOX(rcv_node_raw(box));
-//            char *hdlr_type =  rcv_hdlr_handler_type(hdlr);
-//            if (strcmp(hdlr_type, "soun") == 0) {
-//                m_hasAudio = true;
-//            } else if (strcmp(hdlr_type, "vide") == 0) {
-//                m_hasVideo = true;
-//            } else {
-//                printf("ERROR: MediaSampleHelio hdlr_type:%s\n", hdlr_type);
-//            }
-//
-//        } else {
-//            printf("ERROR: MediaSampleHelio NO HDLR BOX\n");
-//        }
-//        if (!m_hasVideo && !m_hasAudio) {
-//            printf("ERROR: MediaSampleHelio has neither Audio or Video\n");
-//        }
-
         m_pesPacket = cvmf_pes_create(m_hasVideo ? cvmf_pes_type_video : (m_hasAudio ? cvmf_pes_type_audio : cvmf_pes_type_unknown) );
 
         m_timescale = timescale;
         //printf("MediaSampleHelio m_timescale %u\n", m_timescale);
+        //printf("MediaSampleHelio m_id %s\n", m_id.string().utf8().data());
+
+        // NOTE(estobb200): This was a debug print when we were dropping
+        // packets due to https://bugs.webkit.org/show_bug.cgi?id=182200
+
+        // if (m_hasAudio) {
+        //     rcv_node_t *box = rcv_node_child(m_sample, "tfdt");
+        //     rcv_tfdt_box_t *tfdt = box ? RCV_TFDT_BOX(rcv_node_raw(box)) : NULL;
+        //     uint64_t decode_time = 0;
+        //     if (tfdt) {
+        //         decode_time = rcv_tfdt_base_media_decode_time(tfdt);
+        //     }
+        //     MediaTime expectedNextDecode = decodeTime() + duration();
+        //     printf("ERROR Creating MediaSampleHelio %s with %llu DTS:%f\n\n", // ExpectedNextDecodeTime:%f
+        //            m_hasAudio ? "Audio" : "Video", decode_time, decodeTime().toDouble()); //, expectedNextDecode.toDouble());
+        // }
     }
 
     virtual ~MediaSampleHelio() {
@@ -237,8 +231,10 @@ private:
     }
 
     MediaTime presentationTime() const override;
-    MediaTime decodeTime() const override;
+    // MediaTime decodeTime() const override;
     MediaTime duration() const override;
+
+    void sampleBuffer(uint8_t **buffer, size_t *size);
 
     // TODO: TFHD is it's track ID, we shouldn't support set here.
     // TODO: Why is this part of the interface?
@@ -253,12 +249,23 @@ private:
     size_t sizeInBytes() const override;
 
     // it's width, height if video
-    // TODO: Need to get this from the init header..
+    // TODO: Need to get this from the codecConfiguration
     FloatSize presentationSize() const override;
 
+    /**
+     * offsetTimestampsBy is called by the SourceBuffer during
+     * sourceBufferPrivateDidReceiveSample, when the mode is not `Sequence`.
+     * and the user has set a timestampOffset value.
+     */
     void offsetTimestampsBy(const MediaTime&) override;
 
-    // TODO: When is setTimestamps called??
+    /**
+     * setTimestamps is called by the SourceBuffer during
+     * sourceBufferPrivateDidReceiveSample, when the append mode is
+     * `Sequence`, it provides the presentationTimestamp as arg1, and the
+     * decodeTimestamp as arg2, this should set the samples timestamps
+     * to the generated values provided by the SourceBuffer.
+     */
     void setTimestamps(const MediaTime&, const MediaTime&) override;
 
     bool isDivisable() const override;
@@ -280,7 +287,8 @@ private:
     AtomicString m_id;
 
     rcv_node_t *m_sample;
-    rcv_cursor_t *m_cursor; // Is this the mdat cursor?
+    // The mdat cursor
+    rcv_cursor_t *m_cursor;
     cvmf_pes_t *m_pesPacket;
     uint64_t m_mdatReadOffset;
     int64_t m_ptsAccumulation;

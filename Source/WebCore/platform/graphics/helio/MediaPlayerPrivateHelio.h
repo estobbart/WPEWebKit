@@ -13,8 +13,6 @@
 
 #include "PlayreadySession.h"
 
-#include <pthread.h>
-#include <queue>
 #include "rcvmf_isobmff.h"
 #include "async_queue.h"
 
@@ -114,7 +112,8 @@ public:
     MediaPlayer::ReadyState readyState() const override;
 
     // Looks like this only gets used when calculating memory cost in MediaPlayerPrivate.h
-    std::unique_ptr<PlatformTimeRanges> buffered() const override { return m_mediaPlayer->buffered(); }
+    // not 100% it's usage..
+    std::unique_ptr<PlatformTimeRanges> buffered() const override { return std::make_unique<PlatformTimeRanges>(); }
 
     bool didLoadingProgress() const override;
 
@@ -154,24 +153,12 @@ public:
 
     rcv_media_clock_controller_t * platformClockController();
 
+    // Let's the sourceBuffers signal back to the MediaPlayer, so that
+    // it can dispatch the appropriate EME events through the HTMLMediaElement.
     void sourceBufferDetectedEncryption(uint8_t *systemId, uint8_t *initData, size_t initDataLength);
 
-    void sourceBufferRequiresDecryptionEngine(std::function<void(PlayreadySession *)> task);
-
-    // Called by the SourceBuffer's to decrypt content..
-    // PlayreadySession* decryptionSession() { return prSession; }
-
-    void decryptionSessionStarted(std::unique_ptr<PlayreadySession> playReady) {
-        printf("MediaPlayerPrivateHelio::decryptionSessionStarted\n");
-        //LockHolder lock(&m_prSessionLock);
-        if (m_prSession == nullptr) {
-            printf("MediaPlayerPrivateHelio::decryptionSessionStarted m_prSession assignment\n");
-            m_prSession = std::move(playReady);
-        }
-    }
-
-    bool nextDecryptionSessionTask();
-
+    // This is the background task that we run to dispatch timeupdate events
+    // looking into other options here.
     void timerFired();
 
 protected:
@@ -193,7 +180,6 @@ private:
     static bool _supportsKeySystem(const String& keySystem, const String& mimeType); // MediaEngineSupportsKeySystem
 
     RefPtr<MediaSourcePrivateHelio> m_mediaSourcePrivate;
-    // helio_t *m_helioEngine;
 
     MediaPlayer *m_mediaPlayer;
     rcv_media_clock_controller_t *m_platformClockController;
@@ -214,20 +200,10 @@ private:
 #endif
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) && USE(PLAYREADY)
-    std::unique_ptr<PlayreadySession> m_prSession;
-    // This lock is only used to access the m_prSession
-    //mutable Lock m_prSessionLock;
 
+    // TODO: Does this need the #if?
     // TODO: Move this into the PlayReady lib??
-    // uint8_t *m_initData;
-    // size_t m_initDataLength;
-
     rcv_pssh_box_t *m_pssh;
-
-    std::queue<std::function<void(PlayreadySession *)>> m_emeQueue;
-    std::queue<std::function<void(PlayreadySession *)>> m_emeDecrypt;
-    pthread_cond_t m_queueCond;
-    pthread_mutex_t m_queueMutex;
 
 
 #endif

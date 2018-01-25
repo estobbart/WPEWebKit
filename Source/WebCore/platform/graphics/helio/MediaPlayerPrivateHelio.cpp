@@ -25,33 +25,6 @@
 
 namespace WebCore {
 
-// pthread_t time_update_thread_id;
-//
-//
-// // TODO: check if this is actually needed, or if HTMLMediaElement does this
-// // for us.
-// static void *timeupdate_monitor(void *mediaPlayer) {
-//    while (true) {
-//        // printf("timeupdate_thread sleep 0.250\n");
-//        callOnMainThread([mediaPlayer]{
-//            static_cast<MediaPlayer*>(mediaPlayer)->timeChanged();
-//        });
-//        WTF::sleep(0.250);
-//    }
-// }
-
-
-pthread_t playready_init_thread_id;
-
-static void *playready_start(void *helioPlayer) {
-    printf("MediaPlayerPrivateHelio playready_start thread START\n");
-    static_cast<MediaPlayerPrivateHelio*>(helioPlayer)->decryptionSessionStarted(std::move(std::make_unique<PlayreadySession>()));
-    while(static_cast<MediaPlayerPrivateHelio*>(helioPlayer)->nextDecryptionSessionTask()) {
-
-    }
-    printf("MediaPlayerPrivateHelio playready_start thread END\n");
-}
-
 /**
  * Called from MediaPlayer based on #defines
  */
@@ -173,9 +146,6 @@ MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
     , m_mediaPlayer(player)
     , m_mediaSourcePrivate(0)
     , m_lastReportedDuration(MediaTime::zeroTime())
-    // , m_prSessionLock()
-    , m_emeQueue()
-    , m_emeDecrypt()
     , m_lastReportedTime(0) {
         printf("MediaPlayerPrivateHelio constructor\n");
         m_timeUpdateQueue = NULL;
@@ -191,28 +161,11 @@ MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
 //#endif
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) && USE(PLAYREADY)
-    m_prSession = nullptr;
-
     m_pssh = NULL;
-
-    m_queueCond = PTHREAD_COND_INITIALIZER;
-    m_queueMutex = PTHREAD_MUTEX_INITIALIZER;
-
-    // TODO: Start PlayReady...
-    // pthread_create(&playready_init_thread_id, NULL, playready_start, this);
-
-    // TOOD: this needs a thread..
-    // m_emeTasks.enqueueTask([this] {
-    //     LockHolder lock(&m_prSessionLock);
-    //     if (m_prSession == nullptr) {
-    //         m_prSession = std::make_unique<PlayreadySession>();
-    //
-    //         // if (!m_prSession->init()) {
-    //         //     printf("PlayreadySession() failed to init");
-    //         //     return MediaPlayer::InvalidPlayerState;
-    //         // }
-    //     }
-    // });
+    printf("PlayreadySession::playreadyTask\n");
+    PlayreadySession::playreadyTask(1, [](void *){
+        printf("################################## PlayreadySession started\n");
+    });
 #endif
 }
 
@@ -229,16 +182,10 @@ MediaPlayerPrivateHelio::~MediaPlayerPrivateHelio() {
     if (m_pssh) {
         rcv_destroy_pssh(&m_pssh);
     }
+    PlayreadySession::playreadyTask(1, [](PlayreadySession *prSession){
+        prSession->resetSession();
+    });
 #endif
-
-    // TODO: This stuff needs to be static to the player..
-    //
-    //     std::queue<std::function<void(PlayreadySession *)>> m_emeQueue;
-    //     std::queue<std::function<void(PlayreadySession *)>> m_emeDecrypt;
-    //     pthread_cond_t m_queueCond;
-    //     pthread_mutex_t m_queueMutex;
-    //
-    //
 
 }
 
@@ -246,6 +193,8 @@ void MediaPlayerPrivateHelio::load(const String& url) {
     printf("MediaPlayerPrivateHelio load url%s\n", url.utf8().data());
 }
 
+// TODO: There must be a way to schedule this in the event loop, or
+// some other way to trigger this to fire..
 void helio_player_timeupdate(cvmf_async_queue_t *queue, void *context) {
     printf("helio_player_timeupdate\n");
     callOnMainThread([context]{
@@ -276,10 +225,9 @@ void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* 
 
     m_platformClockController = rcv_media_stream_clock_init();
 
-    // m_timeUpdateQueue = cvmf_queue_init();
 
-    // enqueue_task(m_timeUpdateQueue, cvmf_task_init(helio_player_timeupdate, this));
-    // pthread_create(&time_update_thread_id, NULL, timeupdate_monitor, m_mediaPlayer);
+    m_timeUpdateQueue = cvmf_queue_init();
+    enqueue_task(m_timeUpdateQueue, cvmf_task_init(helio_player_timeupdate, this));
 }
 
 void MediaPlayerPrivateHelio::cancelLoad() {
@@ -395,40 +343,6 @@ void MediaPlayerPrivateHelio::setNetworkState(MediaPlayer::NetworkState state __
     printf("ERROR: MediaPlayerPrivateHelio::setNetworkState not being captured!!!\n");
 }
 
-bool MediaPlayerPrivateHelio::nextDecryptionSessionTask() {
-    // LockHolder lock(&m_prSessionLock);
-    // if (m_prSession == nullptr || ) {
-    //     return false;
-    // }
-    // TODO: This needs to check it's state and have a second queue for actual
-    // decryption
-    printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask pthread_mutex_lock\n");
-    pthread_mutex_lock(&m_queueMutex);
-    if (m_emeQueue.empty() && (m_emeDecrypt.empty() || !m_prSession->ready())) {
-        printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask pthread_cond_wait\n");
-        pthread_cond_wait(&m_queueCond, &m_queueMutex);
-    }
-    if (!m_emeQueue.empty()) {
-        printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask m_emeQueue task\n");
-        m_emeQueue.front()(m_prSession.get());
-        m_emeQueue.pop();
-    }
-    if (m_prSession->ready() && !m_emeDecrypt.empty()) {
-        printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask m_emeDecrypt task\n");
-        auto fn = m_emeDecrypt.front();
-        pthread_mutex_unlock(&m_queueMutex);
-        fn(m_prSession.get());
-        pthread_mutex_lock(&m_queueMutex);
-        m_emeDecrypt.pop();
-    }
-    printf("MediaPlayerPrivateHelio::nextDecryptionSessionTask pthread_mutex_unlock\n");
-    pthread_mutex_unlock(&m_queueMutex);
-    return true;
-
-    //pthread_cond_t m_queueCond;
-    //pthread_mutex_t m_queueMutex;
-}
-
 void hex_dump_buffer_pssh(uint8_t *buffer, size_t size) {
     //printf("PSSH**********************\n");
     uint8_t count = 0;
@@ -477,36 +391,31 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::addKey(const String& key
 
     RefPtr<Uint8Array> keyUint8Data = Uint8Array::create(key, keyLength);
 
-    printf("MediaPlayerPrivateHelio::addKey mutex lock\n");
-    pthread_mutex_lock(&m_queueMutex);
 
-    // TODO: weakThis
-    // TODO: Am I screwing up refcounts here?
+    // // TODO: weakThis
+    // // TODO: Am I screwing up refcounts here?
     printf("MediaPlayerPrivateHelio::addKey m_emeQueue.push\n");
-    // TODO: customData??
-    m_emeQueue.push([this, keySystem, keyUint8Data](PlayreadySession *prSession){
-        printf("MediaPlayerPrivateHelio::addKey task\n");
-        unsigned short errorCode;
-        uint32_t systemCode;
-        printf("MediaPlayerPrivateHelio::addKey m_prSession->playreadyProcessKey\n");
-        //bool playreadyProcessKey(Uint8Array* key, unsigned short& errorCode, uint32_t& systemCode);
-        bool ready = prSession->playreadyProcessKey(keyUint8Data.get(), errorCode, systemCode);
-        if (ready) {
-            printf("MediaPlayerPrivateHelio::addKey callOnMainThread m_mediaPlayer->keyAdded\n");
-            // void keyAdded(const String& keySystem, const String& sessionId);
-            callOnMainThread([this, keySystem]{
-                m_mediaPlayer->keyAdded(keySystem,  m_prSession->sessionId());
-            });
-        } else {
-            printf("MediaPlayerPrivateHelio::addKey callOnMainThread m_mediaPlayer->keyError\n");
-            // void keyError(const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode, unsigned short systemCode);
-        }
-    });
+    // // TODO: customData??
 
-    printf("MediaPlayerPrivateHelio::addKey pthread_cond_signal\n");
-    pthread_cond_signal(&m_queueCond);
-    printf("MediaPlayerPrivateHelio::addKey pthread_mutex_unlock\n");
-    pthread_mutex_unlock(&m_queueMutex);
+    PlayreadySession::playreadyTask(1, [this, keySystem, keyUint8Data](PlayreadySession *prSession){
+
+            printf("MediaPlayerPrivateHelio::addKey task\n");
+            unsigned short errorCode;
+            uint32_t systemCode;
+            printf("MediaPlayerPrivateHelio::addKey m_prSession->playreadyProcessKey\n");
+            //bool playreadyProcessKey(Uint8Array* key, unsigned short& errorCode, uint32_t& systemCode);
+            bool ready = prSession->playreadyProcessKey(keyUint8Data.get(), errorCode, systemCode);
+            if (ready) {
+                printf("MediaPlayerPrivateHelio::addKey callOnMainThread m_mediaPlayer->keyAdded\n");
+                // void keyAdded(const String& keySystem, const String& sessionId);
+                callOnMainThread([this, keySystem, prSession]{
+                    m_mediaPlayer->keyAdded(keySystem,  prSession->sessionId());
+                });
+            } else {
+                printf("ERROR TODO: MediaPlayerPrivateHelio::addKey callOnMainThread m_mediaPlayer->keyError\n");
+                // void keyError(const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode, unsigned short systemCode);
+            }
+    });
 
     return MediaPlayer::NoError;
 }
@@ -564,13 +473,10 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::generateKeyRequest(const
         return MediaPlayer::NoError;
     }
 
-    printf("MediaPlayerPrivateHelio::generateKeyRequest mutex lock\n");
-    pthread_mutex_lock(&m_queueMutex);
-
     // TODO: weakThis
     // TODO: Am I screwing up refcounts here?
-    printf("MediaPlayerPrivateHelio::generateKeyRequest m_emeQueue.push\n");
-    m_emeQueue.push([this, keySystem, customData](PlayreadySession *prSession){
+    printf("MediaPlayerPrivateHelio::generateKeyRequest playreadyTask\n");
+    PlayreadySession::playreadyTask(1, [this, keySystem, customData](PlayreadySession *prSession){
         printf("MediaPlayerPrivateHelio::generateKeyRequest task\n");
         uint8_t *init_data = NULL;
         size_t size = 0;
@@ -598,15 +504,10 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::generateKeyRequest(const
         URL url(URL(), destinationURL);
         printf("playready generateKeyRequest result size %u, sessionId: %s\n", result->length(), prSession->sessionId().utf8().data());
 
-        callOnMainThread([this, keySystem, result, url]{
-            m_mediaPlayer->keyMessage(keySystem, m_prSession->sessionId(), result->data(), result->length(), url);
+        callOnMainThread([this, keySystem, result, url, prSession]{
+            m_mediaPlayer->keyMessage(keySystem, prSession->sessionId(), result->data(), result->length(), url);
         });
     });
-
-    printf("MediaPlayerPrivateHelio::generateKeyRequest pthread_cond_signal\n");
-    pthread_cond_signal(&m_queueCond);
-    printf("MediaPlayerPrivateHelio::generateKeyRequest pthread_mutex_unlock\n");
-    pthread_mutex_unlock(&m_queueMutex);
 
     return MediaPlayer::NoError;
 
@@ -665,28 +566,17 @@ void MediaPlayerPrivateHelio::sourceBufferDetectedEncryption(uint8_t *systemId, 
     //     m_prSession = std::make_unique<PlayreadySession>();
     // }
 
-    if (!m_prSession->keyRequested()) {
-        printf("MediaPlayerPrivateHelio !prSession->keyRequested()\n");
-        return;
-    }
+    // if (!m_prSession->keyRequested()) {
+    //     printf("MediaPlayerPrivateHelio !prSession->keyRequested()\n");
+    //     return;
+    // }
 
 
-    printf("MediaPlayerPrivateHelio m_mediaPlayer->keyNeeded()\n");
+    printf("ERROR TODO: MediaPlayerPrivateHelio m_mediaPlayer->keyNeeded()\n");
     //    (const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength);
-    bool result = m_mediaPlayer->keyNeeded(keySystem, m_prSession->sessionId(), initData, initDataLength);
+    // bool result = m_mediaPlayer->keyNeeded(keySystem, m_prSession->sessionId(), initData, initDataLength);
 
-    printf("MediaPlayerPrivateHelio m_mediaPlayer->keyNeeded():%i\n", result);
-}
-
-// TODO: This should probably take a sessionId or some info based on the key?
-void MediaPlayerPrivateHelio::sourceBufferRequiresDecryptionEngine(std::function<void(PlayreadySession *)> task) {
-    printf("MediaPlayerPrivateHelio::sourceBufferRequiresDecryptionEngine m_emeDecrypt.push\n");
-    pthread_mutex_lock(&m_queueMutex);
-    m_emeDecrypt.push(task);
-    printf("MediaPlayerPrivateHelio::sourceBufferRequiresDecryptionEngine pthread_cond_signal\n");
-    pthread_cond_signal(&m_queueCond);
-    printf("MediaPlayerPrivateHelio::sourceBufferRequiresDecryptionEngine pthread_mutex_unlock\n");
-    pthread_mutex_unlock(&m_queueMutex);
+    //printf("MediaPlayerPrivateHelio m_mediaPlayer->keyNeeded():%i\n", result);
 }
 
 /**
