@@ -11,6 +11,9 @@
 #include "aac.h"
 #include "avc.h"
 
+#define HCC_PRINT 0
+#define MSH_PRINT 0
+
 // TODO: Read up on this..
 
 // https://developer.apple.com/documentation/coremedia/cmsamplebuffer?language=objc
@@ -44,14 +47,18 @@ public:
     static Ref<HelioAudioCodecConfiguration> create(uint8_t profile,
                                                     uint8_t sampling_frequency_index,
                                                     uint8_t channel_config) {
+#if HCC_PRINT
         printf("HelioAudioCodecConfiguration::create\n");
+#endif
         return adoptRef(*new HelioAudioCodecConfiguration(profile,
                                                           sampling_frequency_index,
                                                           channel_config));
     }
 
     ~HelioAudioCodecConfiguration() {
+#if HCC_PRINT
         printf("HelioAudioCodecConfiguration ~HelioAudioCodecConfiguration\n");
+#endif
         free(m_aacConf);
     }
 
@@ -63,8 +70,10 @@ private:
     HelioAudioCodecConfiguration(uint8_t profile,
                                  uint8_t sampling_frequency_index,
                                  uint8_t channel_config) {
+#if HCC_PRINT
         printf("HelioAudioCodecConfiguration profile:%u sampling_frequency_index:%u channel_config:%u\n",
                profile, sampling_frequency_index, channel_config);
+#endif
         m_aacConf = malloc(sizeof(rcv_aac_config_t));
         memset(m_aacConf, 0, sizeof(rcv_aac_config_t));
         m_aacConf->profile = profile;
@@ -78,12 +87,16 @@ private:
 class HelioVideoCodecConfiguration final : public HelioCodecConfiguration {
 public:
     static Ref<HelioVideoCodecConfiguration> create(rcv_param_sets_t *paramSets) {
+#if HCC_PRINT
         printf("HelioVideoCodecConfiguration::create\n");
+#endif
         return adoptRef(*new HelioVideoCodecConfiguration(paramSets));
     }
 
     ~HelioVideoCodecConfiguration() {
+#if HCC_PRINT
         printf("HelioVideoCodecConfiguration ~HelioVideoCodecConfiguration\n");
+#endif
         // TODO: This is a mess.. refactor needed.
         free(m_paramSets->sps[0]->nal_unit);
         free(m_paramSets->pps[0]->nal_unit);
@@ -215,7 +228,9 @@ private:
     }
 
     virtual ~MediaSampleHelio() {
+#if MSH_PRINT
         printf("~MediaSampleHelio\n");
+#endif
         if (m_sample) {
             rcv_destory_tree(&m_sample);
         }

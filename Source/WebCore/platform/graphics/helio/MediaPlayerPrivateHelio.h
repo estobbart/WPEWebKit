@@ -161,10 +161,16 @@ public:
     // looking into other options here.
     void timerFired();
 
+    WeakPtr<MediaPlayerPrivateHelio> createWeakThis() { return m_weakFactory.createWeakPtr(); }
+
 protected:
     void setNetworkState(MediaPlayer::NetworkState);
 
 private:
+
+    // TODO: Use these in the callOnMainThread blocks
+
+    WeakPtrFactory<MediaPlayerPrivateHelio> m_weakFactory;
 
     void setReadyState(MediaPlayer::ReadyState);
 

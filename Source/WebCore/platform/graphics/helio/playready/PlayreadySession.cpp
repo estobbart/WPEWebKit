@@ -43,6 +43,8 @@
 
 extern DRM_CONST_STRING g_dstrDrmPath;
 
+#define PRS_PRINT 1
+
 namespace WebCore {
 
 // The default location of CDM DRM store.
@@ -87,7 +89,9 @@ struct _PlayreadySession : PlayreadySession {
 };
 
 static void *playready_start(void *playreadySession) {
+#if PRS_PRINT
     printf("PlayreadySession playready_start thread START\n");
+#endif
     _PlayreadySession *prSession = static_cast<_PlayreadySession *>(playreadySession);
 
     //static_cast<MediaPlayerPrivateHelio*>(helioPlayer)->decryptionSessionStarted(std::move(std::make_unique<PlayreadySession>()));
@@ -95,11 +99,17 @@ static void *playready_start(void *playreadySession) {
     //
     // }
     // TODO: Signal the condition so that the constructor returns
-    printf("prSession->_drmSessionInit\n");
+#if PRS_PRINT
+    printf("PlayreadySession prSession->_drmSessionInit\n");
+#endif
     prSession->_drmSessionInit();
-    printf("prSession->_nextTask\n");
+#if PRS_PRINT
+    printf("PlayreadySession prSession->_nextTask\n");
+#endif
     while (prSession->_nextTask()) { }
+#if PRS_PRINT
     printf("PlayreadySession playready_start thread END\n");
+#endif
 }
 
 PlayreadySession* PlayreadySession::gPlayreadySession = nullptr;
@@ -109,16 +119,20 @@ pthread_cond_t PlayreadySession::queueCond;
 pthread_mutex_t PlayreadySession::queueMutex;
 
 static void PlayreadySession::playreadyTask(TaskPriority priority, std::function< void (PlayreadySession*) > task) {
+#if PRS_PRINT
     printf("PlayreadySession::playreadyTask %i\n", priority);
+#endif
     if (gPlayreadySession == nullptr) {
         // TODO: This should occur in the thread and let the function
         // quickly return..
         // Or let the thread do the actual init...
+#if PRS_PRINT
         printf("gPlayreadySession = new PlayreadySession\n");
+#endif
         gPlayreadySession = new PlayreadySession();
     }
 
-    printf("playreadyTask pthread_mutex_lock(&queueMutex);\n");
+    // printf("playreadyTask pthread_mutex_lock(&queueMutex);\n");
     pthread_mutex_lock(&queueMutex);
     if (priority == KEY) {
         prTaskQueue.push(task);
@@ -127,7 +141,7 @@ static void PlayreadySession::playreadyTask(TaskPriority priority, std::function
     }
     pthread_cond_signal(&queueCond);
     pthread_mutex_unlock(&queueMutex);
-    printf("playreadyTask pthread_mutex_unlock(&queueMutex);\n");
+    // printf("playreadyTask pthread_mutex_unlock(&queueMutex);\n");
 }
 
 PlayreadySession::PlayreadySession()
@@ -139,7 +153,9 @@ PlayreadySession::PlayreadySession()
     , m_fCommit(FALSE)
     , m_sessionId(createCanonicalUUIDString())
 {
+#if PRS_PRINT
     printf("PlayreadySession::PlayreadySession()\n");
+#endif
     pthread_cond_init(&queueCond, NULL);
     pthread_mutex_init(&queueMutex, NULL);
 
@@ -152,7 +168,9 @@ PlayreadySession::PlayreadySession()
 
 PlayreadySession::~PlayreadySession()
 {
+#if PRS_PRINT
     printf("PlayreadySession Releasing resources\n");
+#endif
 
     Drm_Uninitialize (m_poAppContext);
 
@@ -163,14 +181,24 @@ PlayreadySession::~PlayreadySession()
     SAFE_OEM_FREE(m_poAppContext);
 }
 
+// TODO: Refactor this to be by the KeyId
 void PlayreadySession::resetSession() {
     pthread_mutex_lock(&queueMutex);
+#if PRS_PRINT
+    printf("PlayreadySession::resetSession()\n");
+#endif
 
-    prTaskQueue = std::queue<std::function<void(PlayreadySession *)>>();
-    prDecryptQueue = std::queue<std::function<void(PlayreadySession *)>>();
+    if (m_eKeyState != KEY_INIT) {
+#if PRS_PRINT
+        printf("PlayreadySession::resetSession() Drm_Reinitialize, m_eKeyState = KEY_INIT, & m_sessionId()\n");
+#endif
+        //prTaskQueue = std::queue<std::function<void(PlayreadySession *)>>();
+        prDecryptQueue = std::queue<std::function<void(PlayreadySession *)>>();
 
-    m_eKeyState = KEY_INIT;
-    m_sessionId = createCanonicalUUIDString();
+        Drm_Reinitialize(m_poAppContext);
+        m_eKeyState = KEY_INIT;
+        m_sessionId = createCanonicalUUIDString();
+    }
 
     pthread_mutex_unlock(&queueMutex);
 }
@@ -180,14 +208,20 @@ bool PlayreadySession::_nextTask() {
     pthread_mutex_lock(&queueMutex);
     // PlayreadySession::_nextTask pthread_cond_wait 0 1
     if (prTaskQueue.empty() && (prDecryptQueue.empty() || m_eKeyState != KEY_READY)) {
+#if PRS_PRINT
         printf("PlayreadySession::_nextTask pthread_cond_wait %i %i\n",
                prDecryptQueue.empty(), (prDecryptQueue.empty() || m_eKeyState < KEY_READY));
+#endif
         pthread_cond_wait(&queueCond, &queueMutex);
+        pthread_mutex_unlock(&queueMutex);
+        return true;
     }
 
     bool keyTask = !prTaskQueue.empty();
+#if PRS_PRINT
     printf("PlayreadySession::_nextTask pthread_cond_wait resume %s task.\n", keyTask ? "keyTask" : "decryptTask");
-    printf("PlayreadySession::_nextTask remaing %i \n", keyTask ? prTaskQueue.size() : prDecryptQueue.size());
+    // printf("PlayreadySession::_nextTask remaing %i \n", keyTask ? prTaskQueue.size() : prDecryptQueue.size());
+#endif
     auto fn = keyTask ? prTaskQueue.front() : prDecryptQueue.front();
     pthread_mutex_unlock(&queueMutex);
 
@@ -199,14 +233,16 @@ bool PlayreadySession::_nextTask() {
     if (!prTaskQueue.empty() || !prDecryptQueue.empty()) {
         keyTask ? prTaskQueue.pop() : prDecryptQueue.pop();
     }
-    printf("PlayreadySession::_nextTask task popped, %i left\n", keyTask ? prTaskQueue.size() : prDecryptQueue.size());
+    // printf("PlayreadySession::_nextTask task popped, %i left\n", keyTask ? prTaskQueue.size() : prDecryptQueue.size());
     pthread_mutex_unlock(&queueMutex);
 
     return true;
 }
 
 void PlayreadySession::_drmSessionInit() {
+#if PRS_PRINT
     printf("void PlayreadySession::_drmSessionInit() \n");
+#endif
     pthread_mutex_lock(&queueMutex);
     pthread_cond_signal(&queueCond);
     pthread_mutex_unlock(&queueMutex);
@@ -226,7 +262,9 @@ void PlayreadySession::_drmSessionInit() {
     g_dstrDrmPath = g_dstrCDMDrmPath;
 
     // Initialize DRM app context.
+#if PRS_PRINT
     printf("PlayreadySession -> Drm_Initialize %s\n", g_dstrCDMDrmStoreName);
+#endif
     ChkDR(Drm_Initialize(m_poAppContext,
                          NULL,
                          m_pbOpaqueBuffer,
@@ -235,34 +273,40 @@ void PlayreadySession::_drmSessionInit() {
 
     if (DRM_REVOCATION_IsRevocationSupported()) {
         ChkMem(m_pbRevocationBuffer = (DRM_BYTE *)Oem_MemAlloc(REVOCATION_BUFFER_SIZE));
-
+#if PRS_PRINT
         printf("PlayreadySession -> Drm_Revocation_SetBuffer\n");
+#endif
         ChkDR(Drm_Revocation_SetBuffer(m_poAppContext,
                                        m_pbRevocationBuffer,
                                        REVOCATION_BUFFER_SIZE));
     }
 
     // Generate a random media session ID.
+#if PRS_PRINT
     printf("PlayreadySession -> Oem_Random_GetBytes\n");
+#endif
     ChkDR(Oem_Random_GetBytes(NULL, (DRM_BYTE *)&oSessionID, SIZEOF(oSessionID)));
 
     ZEROMEM(m_rgchSessionID, SIZEOF(m_rgchSessionID));
     // Store the generated media session ID in base64 encoded form.
+#if PRS_PRINT
     printf("PlayreadySession -> DRM_B64_EncodeA\n");
+#endif
     ChkDR(DRM_B64_EncodeA((DRM_BYTE *)&oSessionID,
                           SIZEOF(oSessionID),
                           m_rgchSessionID,
                           &cchEncodedSessionID,
                           0));
-
+#if PRS_PRINT
     printf("PlayreadySession initialized\n");
+#endif
 
  ErrorExit:
     if (DRM_FAILED(dr)) {
         DRM_CHAR *errName = NULL;
         DRM_ERR_GetErrorNameFromCode(dr, &errName);
         m_eKeyState = KEY_ERROR;
-        printf("Playready ERROR initialization failed: %s\n", errName);
+        printf("*************** PlayreadySession ERROR initialization failed: %s\n", errName);
     }
 }
 
@@ -272,6 +316,9 @@ void PlayreadySession::_drmSessionInit() {
 // does nothing.
 DRM_RESULT DRM_CALL PlayreadySession::_PolicyCallback(const DRM_VOID *, DRM_POLICY_CALLBACK_TYPE, const DRM_VOID *)
 {
+#if PRS_PRINT
+    printf("*************** PlayreadySession _PolicyCallback\n");
+#endif
     return DRM_SUCCESS;
 }
 
@@ -286,22 +333,29 @@ RefPtr<Uint8Array> PlayreadySession::playreadyGenerateKeyRequest(Uint8Array* ini
     DRM_DWORD cbChallenge = 0;
     DRM_CHAR *pchSilentURL = NULL;
     DRM_DWORD cchSilentURL = 0;
-
+#if PRS_PRINT
     printf("PlayreadySession generating key request\n");
+#endif
     // GST_MEMDUMP("init data", initData->data(), initData->byteLength());
 
     // The current state MUST be KEY_INIT otherwise error out.
     ChkBOOL(m_eKeyState == KEY_INIT, DRM_E_INVALIDARG);
-
+#if PRS_PRINT
+    printf("PlayreadySession Drm_Content_SetProperty\n");
+#endif
     ChkDR(Drm_Content_SetProperty(m_poAppContext,
                                   DRM_CSP_AUTODETECT_HEADER,
                                   initData->data(),
                                   initData->byteLength()));
+#if PRS_PRINT
     printf("PlayreadySession init data set on DRM context\n");
+#endif
 
     // FIXME: Revert once re-use of key is fixed
     Drm_Reader_Bind(m_poAppContext, g_rgpdstrRights, NO_OF(g_rgpdstrRights), _PolicyCallback, NULL, &m_oDecryptContext);
+#if PRS_PRINT
     printf("PlayreadySession DRM reader bound\n");
+#endif
 
     // Try to figure out the size of the license acquisition
     // challenge to be returned.
@@ -322,20 +376,26 @@ RefPtr<Uint8Array> PlayreadySession::playreadyGenerateKeyRequest(Uint8Array* ini
         if (cchSilentURL > 0) {
             ChkMem(pchSilentURL = (DRM_CHAR *)Oem_MemAlloc(cchSilentURL + 1));
             ZEROMEM(pchSilentURL, cchSilentURL + 1);
+#if PRS_PRINT
             printf("PlayreadySession allocated silent url size %d\n", cchSilentURL);
+#endif
         }
 
         // Allocate buffer that is sufficient to store the license acquisition
         // challenge.
         if (cbChallenge > 0) {
             ChkMem(pbChallenge = (DRM_BYTE *)Oem_MemAlloc(cbChallenge));
+#if PRS_PRINT
             printf("PlayreadySession allocated challenge size %d\n", cbChallenge);
+#endif
         }
 
         dr = DRM_SUCCESS;
     } else {
          ChkDR(dr);
+#if PRS_PRINT
          printf("PlayreadySession challenge generated\n");
+#endif
     }
 
     // Supply a buffer to receive the license acquisition challenge.
@@ -351,13 +411,16 @@ RefPtr<Uint8Array> PlayreadySession::playreadyGenerateKeyRequest(Uint8Array* ini
                                            NULL,
                                            pbChallenge,
                                            &cbChallenge));
-
+#if PRS_PRINT
     printf("PlayreadySession generated license request of size %d\n", cbChallenge);
+#endif
     // GST_MEMDUMP("generated license request :", pbChallenge, cbChallenge);
 
     result = Uint8Array::create(pbChallenge, cbChallenge);
     destinationURL = static_cast<const char *>(pchSilentURL);
+#if PRS_PRINT
     printf("PlayreadySession destination URL : %s\n", destinationURL.utf8().data());
+#endif
 
     m_eKeyState = KEY_PENDING;
     systemCode = dr;
@@ -369,7 +432,7 @@ RefPtr<Uint8Array> PlayreadySession::playreadyGenerateKeyRequest(Uint8Array* ini
 
 ErrorExit:
     if (DRM_FAILED(dr)) {
-        printf("PlayreadySession ERROR DRM key generation failed\n");
+        printf("******************** PlayreadySession ERROR DRM key generation failed:%016X\n", dr);
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) || ENABLE(LEGACY_ENCRYPTED_MEDIA)
         errorCode = WebKitMediaKeyError::MEDIA_KEYERR_CLIENT;
 #endif
@@ -412,13 +475,15 @@ bool PlayreadySession::playreadyProcessKey(Uint8Array* key, unsigned short& erro
     m_key = key->possiblySharedBuffer();
     errorCode = 0;
     m_eKeyState = KEY_READY;
+#if PRS_PRINT
     printf("PlayreadySession key processed, now ready for content decryption\n");
+#endif
     systemCode = dr;
     return true;
 
 ErrorExit:
     if (DRM_FAILED(dr)) {
-        printf("PlayreadySession failed processing license response\n");
+        printf("*************** PlayreadySession failed processing license response\n");
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) || ENABLE(LEGACY_ENCRYPTED_MEDIA)
         errorCode = WebKitMediaKeyError::MEDIA_KEYERR_CLIENT;
 #endif
@@ -474,6 +539,7 @@ int PlayreadySession::processPayload(const void* iv, uint32_t ivSize, void* payl
     return 0;
 
 ErrorExit:
+    printf("*************** PlayreadySession::processPayload failed\n");
     //G_UNLOCK (pr_decoder_lock); // TODO:
     return 1;
 }

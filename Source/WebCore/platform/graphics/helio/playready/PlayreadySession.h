@@ -76,7 +76,7 @@ public:
     // The taskQueue has it's own mutex so it's safe to request additional
     // tasks within a task.
 
-    // TODO: MAy need to keep a map of keys, and let the decryption tasks
+    // TODO: May need to keep a map of keys, and let the decryption tasks
     // specify which key they need, to be able to do license rotation
 
     /**
@@ -89,6 +89,9 @@ public:
      */
     RefPtr<Uint8Array> playreadyGenerateKeyRequest(Uint8Array* initData, const String& customData, String& destinationURL, unsigned short& errorCode, uint32_t& systemCode);
 
+    // TODO: Processing the key can error prone.. we may still have data
+    // that we need to decrypt with a prior key, but putting the new key in HW
+    // would break that. This causes key rotation to fail.
     bool playreadyProcessKey(Uint8Array* key, unsigned short& errorCode, uint32_t& systemCode);
 
     int processPayload(const void* iv, uint32_t ivSize, void* payloadData, uint32_t payloadDataSize);

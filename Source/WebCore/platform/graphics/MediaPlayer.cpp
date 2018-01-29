@@ -1194,7 +1194,6 @@ void MediaPlayer::muteChanged(bool newMuted)
 
 void MediaPlayer::timeChanged()
 {
-    printf("m_client.timeChanged()\n");
     m_client.mediaPlayerTimeChanged(this);
 }
 

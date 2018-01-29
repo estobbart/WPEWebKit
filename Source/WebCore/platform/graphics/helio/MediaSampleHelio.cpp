@@ -61,7 +61,7 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer,
             // TODO: Seem to be getting lipsync issues
             // total hack.. needs to be moved/removed
             if (m_hasAudio && m_ptsAccumulation == 0) {
-                m_ptsAccumulation += 22000; // .38 ms - 3 frames
+                m_ptsAccumulation += 22500; // previous used 22000 .38 ms - 3 frames
             }
             // TODO: Need to properly handle rollovers
             uint64_t pts = m_ptsAccumulation + rcv_tfdt_base_media_decode_time(tfdt) + m_timestampOffset;
@@ -142,7 +142,9 @@ bool MediaSampleHelio::writeNextPESPacket(uint8_t **buffer,
 
             }
         } else {
+#if MSH_PRINT
             printf("MediaSampleHelio::writeNextPESPacket no more samples\n");
+#endif
             return false;
         }
     } else {
@@ -235,7 +237,9 @@ bool MediaSampleHelio::decryptBuffer(std::function<int(const void* iv, uint32_t 
             uint32_t result = decrypt(iv, ivSize, encryptedBuffer, encryptedSize);
             if (result) {
                 // TODO: If this errors return false
+#if MSH_PRINT
                 printf("MediaSampleHelio::decryptBuffer decrypt: %u\n", result);
+#endif
             }
 
             if (rcv_senc_subsample_encryption(senc)) {
@@ -281,7 +285,9 @@ MediaTime MediaSampleHelio::presentationTime() const {
             rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
             MediaTime _decodeTime = this->decodeTime();
             double pts = rcv_trun_first_presentation_time(trun, _decodeTime.toDouble(), m_timescale);
+#if MSH_PRINT
             printf("PRESENTATION TIME:%f\n", pts);
+#endif
             m_presentationTime = MediaTime::createWithDouble(pts);
         }
     }
@@ -293,8 +299,11 @@ MediaTime MediaSampleHelio::decodeTime() const {
         rcv_node_t *box = rcv_node_child(m_sample, "tfdt");
         if (box) {
             rcv_tfdt_box_t *tfdt = RCV_TFDT_BOX(rcv_node_raw(box));
+            // printf("decodeTime(): BASE MEDIA DECODE TIME:%llu\n", rcv_tfdt_base_media_decode_time(tfdt));
             double dts = rcv_tfdt_decode_time_seconds(tfdt, m_timescale);
+#if MSH_PRINT
             printf("DECODE TIME:%f\n", dts);
+#endif
             m_decodeTime = MediaTime::createWithDouble(dts);
         }
     }
@@ -307,7 +316,9 @@ MediaTime MediaSampleHelio::duration() const {
         if (box) {
             rcv_trun_box_t *trun = RCV_TRUN_BOX(rcv_node_raw(box));
             double duration = rcv_trun_duration(trun, m_timescale);
+#if MSH_PRINT
             printf("DURATION TIME:%f\n", duration);
+#endif
             m_duration = MediaTime::createWithDouble(duration);
         }
     }
@@ -315,7 +326,9 @@ MediaTime MediaSampleHelio::duration() const {
 }
 
 size_t MediaSampleHelio::sizeInBytes() const {
+#if MSH_PRINT
     printf("MediaSampleHelio::sizeInBytes ");
+#endif
     rcv_node_t *node = rcv_node_child(m_sample, "mdat");
     if (node) {
         rcv_mdat_box_t *mdat = RCV_MDAT_BOX(rcv_node_raw(node));
@@ -328,12 +341,16 @@ size_t MediaSampleHelio::sizeInBytes() const {
 }
 
 FloatSize MediaSampleHelio::presentationSize() const {
+#if MSH_PRINT
     printf("TODO: MediaSampleHelio::presentationSize\n");
+#endif
     return FloatSize();
 }
 
 void MediaSampleHelio::offsetTimestampsBy(const MediaTime &mediaTime) {
+#if MSH_PRINT
     printf("MediaSampleHelio::offsetTimestampsBy %f\n", mediaTime.toFloat());
+#endif
     m_timestampOffset = round(mediaTime.toDouble() * m_timescale);
 }
 
@@ -350,18 +367,24 @@ void MediaSampleHelio::setTimestamps(const MediaTime &mediaTimeOne __attribute__
 // a sample. But it still TDB if it's worth dividing them.
 // TODO: For audio we can divide while the sample count is > 1.
 bool MediaSampleHelio::isDivisable() const {
+#if MSH_PRINT
     printf("MediaSampleHelio::isDivisable TODO\n");
+#endif
     return false;
 }
 
 std::pair<RefPtr<MediaSample>, RefPtr<MediaSample>> MediaSampleHelio::divide(const MediaTime& presentationTime __attribute__((unused))) {
+#if MSH_PRINT
     printf("TODO: MediaSampleHelio::divide\n");
+#endif
     return { nullptr, nullptr };
 }
 
 // TODO: Create a non-display copy by freeing the MDAT box
 Ref<MediaSample> MediaSampleHelio::createNonDisplayingCopy() const {
+#if MSH_PRINT
     printf("TODO: MediaSampleHelio::createNonDisplayingCopy\n");
+#endif
     /**
      error: could not convert '(const WebCore::MediaSampleHelio*)this' from 'const WebCore::MediaSampleHelio*' to 'WTF::Ref<WebCore::MediaSample>'
      |      return this; //MediaSampleHelio::create(NULL, 0, m_codecConf);
@@ -373,7 +396,9 @@ Ref<MediaSample> MediaSampleHelio::createNonDisplayingCopy() const {
 // See comments about being divisible.
 MediaSample::SampleFlags MediaSampleHelio::flags() const {
     // TODO: What does audio look like here?
+#if MSH_PRINT
     printf("MediaSampleHelio::flags\n");
+#endif
     /*
     enum SampleFlags {
         None = 0,
@@ -386,13 +411,17 @@ MediaSample::SampleFlags MediaSampleHelio::flags() const {
 
 // TODO: What does this really mean?
 PlatformSample MediaSampleHelio::platformSample() {
+#if MSH_PRINT
     printf("MediaSampleHelio::platformSample\n");
+#endif
     return PlatformSample();
 }
 
 void MediaSampleHelio::dump(PrintStream &ps __attribute__((unused))) const {
     // out.print("{PTS(", presentationTime(), "), DTS(", decodeTime(), "), duration(", duration(), "), flags(", (int)flags(), "), presentationSize(", presentationSize().width(), "x", presentationSize().height(), ")}");
+#if MSH_PRINT
     printf("MediaSampleHelio::dump...\n");
+#endif
 }
 
 void MediaSampleHelio::sampleBuffer(uint8_t **buffer, size_t *size) {
@@ -407,7 +436,9 @@ void MediaSampleHelio::sampleBuffer(uint8_t **buffer, size_t *size) {
     *buffer = rcv_mdat_data(mdat);
     *size = rcv_mdat_data_size(mdat);
     if (m_mdatReadOffset == 0) {
+#if MSH_PRINT
         printf("MediaSampleHelio::sampleBuffer ----> :%zu \n", *size);
+#endif
     }
 }
 

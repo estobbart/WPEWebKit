@@ -22,6 +22,10 @@
 // Period timeupdate dispatcher
 #include <pthread.h>
 //#include <unistd.h>
+#include <math.h> // llround
+
+
+#define MPPH_PRINT 0
 
 namespace WebCore {
 
@@ -40,7 +44,9 @@ void MediaPlayerPrivateHelio::registerMediaEngine(MediaEngineRegistrar registrar
 
 // isTypeSupported
 void MediaPlayerPrivateHelio::_getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& supportedTypes) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio _getSupportedTypes\n");
+#endif
     static NeverDestroyed<HashSet<String, ASCIICaseInsensitiveHash>> cache;
     static bool isInitialized = false;
 
@@ -113,7 +119,9 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
        */
       // TODO: Check these..
       if (!parameters.codecs.isEmpty() && parameters.codecs != "ec-3") {
+#if MPPH_PRINT
           printf("MediaPlayerPrivateHelio::MediaPlayer::IsSupported parameters.isMediaSource and codecs\n");
+#endif
           return MediaPlayer::IsSupported;
       } else {
           return MediaPlayer::IsNotSupported;
@@ -129,25 +137,29 @@ MediaPlayerPrivateHelio::MediaPlayer::MayBeSupported parameters.isMediaSource
       // TODO: If we get a codec we can guarentee support, else it's maybe
       return MediaPlayer::IsNotSupported;
   }
-
   printf("MediaPlayerPrivateHelio::MediaPlayer::IsNotSupported\n");
   return MediaPlayer::IsNotSupported;
 }
 
 bool MediaPlayerPrivateHelio::_supportsKeySystem(const String& keySystem, const String& mimeType) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio _supportsKeySystem(keySystem:%s mimeType:%s)\n", keySystem.utf8().data(), mimeType.utf8().data());
+#endif
     return keySystem == "com.microsoft.playready" || keySystem == "webkit-org.w3.clearkey";
 }
 
 MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
-    : m_mediaSourceClient()
+    : m_weakFactory(this)
+    , m_mediaSourceClient()
     , m_rate(0)
     , m_readyState(MediaPlayer::HaveNothing)
     , m_mediaPlayer(player)
     , m_mediaSourcePrivate(0)
     , m_lastReportedDuration(MediaTime::zeroTime())
     , m_lastReportedTime(0) {
+#if MPPH_PRINT
         printf("MediaPlayerPrivateHelio constructor\n");
+#endif
         m_timeUpdateQueue = NULL;
 #if USE(COORDINATED_GRAPHICS_THREADED)
         m_platformLayerProxy = adoptRef(new TextureMapperPlatformLayerProxy());
@@ -162,21 +174,28 @@ MediaPlayerPrivateHelio::MediaPlayerPrivateHelio(MediaPlayer* player)
 
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) && USE(PLAYREADY)
     m_pssh = NULL;
+#if MPPH_PRINT
     printf("PlayreadySession::playreadyTask\n");
-    PlayreadySession::playreadyTask(1, [](void *){
-        printf("################################## PlayreadySession started\n");
+#endif
+    PlayreadySession::playreadyTask(1, [](PlayreadySession *prSession){
+#if MPPH_PRINT
+        printf("################################## PlayreadySession resetSession\n");
+#endif
+        prSession->resetSession();
     });
 #endif
 }
 
 MediaPlayerPrivateHelio::~MediaPlayerPrivateHelio() {
-    printf("MediaPlayerPrivateHelio destructor\n");
+// #if MPPH_PRINT
+    printf("*******    MediaPlayerPrivateHelio destructor    *******\n");
+// #endif
     if (m_timeUpdateQueue) {
         cvmf_queue_destroy(&m_timeUpdateQueue);
     }
     // To destroy this, you have to close down all the connections first.
     if (m_platformClockController) {
-        // TODO: Destory m_platformClockController
+        rcv_media_stream_clock_destroy(&m_platformClockController);
     }
 #if ENABLE(LEGACY_ENCRYPTED_MEDIA_V1) && USE(PLAYREADY)
     if (m_pssh) {
@@ -190,20 +209,25 @@ MediaPlayerPrivateHelio::~MediaPlayerPrivateHelio() {
 }
 
 void MediaPlayerPrivateHelio::load(const String& url) {
-    printf("MediaPlayerPrivateHelio load url%s\n", url.utf8().data());
+    printf("ERROR MediaPlayerPrivateHelio load url%s\n", url.utf8().data());
 }
 
 // TODO: There must be a way to schedule this in the event loop, or
 // some other way to trigger this to fire..
 void helio_player_timeupdate(cvmf_async_queue_t *queue, void *context) {
+#if MPPH_PRINT
     printf("helio_player_timeupdate\n");
-    callOnMainThread([context]{
-        static_cast<MediaPlayerPrivateHelio*>(context)->timerFired();
+#endif
+    WeakPtr<MediaPlayerPrivateHelio> weakThis = static_cast<MediaPlayerPrivateHelio*>(context)->createWeakThis();
+    callOnMainThread([weakThis]{
+        if (weakThis) {
+            weakThis->timerFired();
+        }
     });
 
     enqueue_task(queue, cvmf_task_init(helio_player_timeupdate, context));
 
-    WTF::sleep(0.250);
+    WTF::sleep(0.5);
 }
 
 void MediaPlayerPrivateHelio::timerFired() {
@@ -211,12 +235,17 @@ void MediaPlayerPrivateHelio::timerFired() {
         return;
     }
     m_lastReportedTime = currentTime();
+#if MPPH_PRINT
+    printf("MediaPlayerPrivateHelio::timerFired new time: %f\n", m_lastReportedTime);
+#endif
     m_mediaPlayer->timeChanged();
 }
 
 
 void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* client) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio load url:%s, client\n", url.utf8().data());
+#endif
     m_networkState = MediaPlayer::Loading;
     m_mediaPlayer->networkStateChanged();
 
@@ -231,16 +260,21 @@ void MediaPlayerPrivateHelio::load(const String& url, MediaSourcePrivateClient* 
 }
 
 void MediaPlayerPrivateHelio::cancelLoad() {
-    printf("MediaPlayerPrivateHelio cancelLoad\n");
+    printf("ERROR MediaPlayerPrivateHelio cancelLoad\n");
 }
 
 void MediaPlayerPrivateHelio::play() {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio play\n");
+#endif
     m_rate = 1;
+    rcv_media_stream_clock_start(m_platformClockController);
 }
 
 void MediaPlayerPrivateHelio::pause() {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio pause\n");
+#endif
     m_rate = 0;
 }
 
@@ -272,17 +306,38 @@ MediaTime MediaPlayerPrivateHelio::durationMediaTime() const {
     return m_mediaSourceClient->duration();
 }
 
+// TODO: Switch this to a MediaTime
 float MediaPlayerPrivateHelio::currentTime() const {
+    // printf("MediaPlayerPrivateHelio::currentTime()\n");
     rcv_media_platform_t *platform =  m_mediaSourcePrivate->mediaPlatform();
     if (!platform) {
-       printf("MediaPlayerPrivateHelio::currentTime() NULL\n");
+       printf("MediaPlayerPrivateHelio::currentTime() m_mediaSourcePrivate->mediaPlatform() == NULL\n");
        return 0;
     }
-    return rcv_media_platform_last_pts(platform) / 90000.0;
+    float currentTime = (rcv_media_platform_last_pts(platform) / 90000.0);
+    // printf("MediaPlayerPrivateHelio::currentTime() %f\n", currentTime);
+    return currentTime;
 }
 
 void MediaPlayerPrivateHelio::seekDouble(double time) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio seekDouble %f \n", time);
+#endif
+
+    // TODO: This needs more logic to call into the mediaSourceClient..
+    //     virtual void seekToTime(const MediaTime&) = 0;
+
+    //m_mediaSourceClient->seekToTime(MediaTime::createWithDouble(time));
+
+    rcv_media_platform_t *platform =  m_mediaSourcePrivate->mediaPlatform();
+    if (platform) {
+        // time 2.085333 == 187680
+        uint64_t pts = llround(time * 90000);
+#if MPPH_PRINT
+        printf("MediaPlayerPrivateHelio rcv_media_platform_set_pts %llu \n", pts);
+#endif
+        rcv_media_platform_set_pts(platform, pts);
+    }
     // Notifying the timeChange dismisses that the player is in a seeking state
     setReadyState(MediaPlayer::HaveFutureData);
     // State must be > HaveFutureData to be able to dismiss the seeking??
@@ -290,7 +345,9 @@ void MediaPlayerPrivateHelio::seekDouble(double time) {
 }
 
 bool MediaPlayerPrivateHelio::seeking() const {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio seeking false\n");
+#endif
     return false;
 }
 
@@ -300,23 +357,31 @@ bool MediaPlayerPrivateHelio::paused() const {
 }
 
 MediaPlayer::NetworkState MediaPlayerPrivateHelio::networkState() const {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio networkState\n");
+#endif
     // enum NetworkState { Empty, Idle, Loading, Loaded, FormatError, NetworkError, DecodeError };
     return m_networkState;
 }
 
 // https://www.w3.org/TR/2011/WD-html5-20110405/video.html#the-ready-states
 MediaPlayer::ReadyState MediaPlayerPrivateHelio::readyState() const {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio readyState\n");
+#endif
     // enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
     return m_readyState;
 }
 
 // TODO: It looks like this occurs and then dispatches the networkState change
 // progress event. Check if setting this flag to false changes that event.
+// progressEventTimerFired in HTMLMediaElement will switch between progress and
+// stalled.
 bool MediaPlayerPrivateHelio::didLoadingProgress() const {
     // TODO: Does this determine when "open" dispatches?
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio didLoadingProgress\n");
+#endif
     // this after being constructed this gets called repeatedly, if you return true, it calls visible and setSize
     return true;
     // This also seems to cause HTMLMediaElement to dispatch the progress event
@@ -328,7 +393,9 @@ void MediaPlayerPrivateHelio::setSize(const IntSize& size) {
 }
 
 void MediaPlayerPrivateHelio::paint(GraphicsContext& ctx, const FloatRect& rect) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio paint\n");
+#endif
     ctx.clearRect(rect);
 }
 
@@ -375,7 +442,9 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::addKey(const String& key
                                                                const unsigned char* initData __attribute__((unused)),
                                                                unsigned initDataLenth __attribute__((unused)),
                                                                const String& sessionId) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio::addKey %s\n", keySystem.utf8().data());
+#endif
 
     if (keySystem == "webkit-org.w3.clearkey") {
         // TODO: See JSCryptoKeySerializationJWK.h
@@ -394,19 +463,26 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::addKey(const String& key
 
     // // TODO: weakThis
     // // TODO: Am I screwing up refcounts here?
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio::addKey m_emeQueue.push\n");
+#endif
     // // TODO: customData??
 
     PlayreadySession::playreadyTask(1, [this, keySystem, keyUint8Data](PlayreadySession *prSession){
-
+#if MPPH_PRINT
             printf("MediaPlayerPrivateHelio::addKey task\n");
+#endif
             unsigned short errorCode;
             uint32_t systemCode;
+#if MPPH_PRINT
             printf("MediaPlayerPrivateHelio::addKey m_prSession->playreadyProcessKey\n");
+#endif
             //bool playreadyProcessKey(Uint8Array* key, unsigned short& errorCode, uint32_t& systemCode);
             bool ready = prSession->playreadyProcessKey(keyUint8Data.get(), errorCode, systemCode);
             if (ready) {
+#if MPPH_PRINT
                 printf("MediaPlayerPrivateHelio::addKey callOnMainThread m_mediaPlayer->keyAdded\n");
+#endif
                 // void keyAdded(const String& keySystem, const String& sessionId);
                 callOnMainThread([this, keySystem, prSession]{
                     m_mediaPlayer->keyAdded(keySystem,  prSession->sessionId());
@@ -424,7 +500,9 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::generateKeyRequest(const
                                                                            const unsigned char* initData,
                                                                            unsigned initDataLength,
                                                                            const String& customData) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio::generateKeyRequest %s\n", keySystem.utf8().data());
+#endif
     //hex_dump_buffer_pssh(initData, initDataLength);
     if (keySystem != "com.microsoft.playready" && keySystem != "webkit-org.w3.clearkey") {
         // MediaPlayerPrivateHelio::generateKeyRequest webkit-org.w3.clearkey
@@ -449,14 +527,20 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::generateKeyRequest(const
         rcv_pssh_data(m_pssh, &psshInitData, &size);
 
         if (size == initDataLength && memcmp(psshInitData, initData, initDataLength) == 0) {
+#if MPPH_PRINT
             printf("MediaPlayerPrivateHelio !Already generating a key for data.. ignoring generateKeyRequest\n");
+#endif
             return;
         }
+#if MPPH_PRINT
         printf("MediaPlayerPrivateHelio NEW PSSH!!!");
+#endif
         rcv_destroy_pssh(&m_pssh);
     }
 
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio::generateKeyRequest init pssh\n");
+#endif
     m_pssh = rcv_pssh_box_init(initData, initDataLength, NULL);
 
     if (!m_pssh) {
@@ -475,9 +559,13 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::generateKeyRequest(const
 
     // TODO: weakThis
     // TODO: Am I screwing up refcounts here?
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio::generateKeyRequest playreadyTask\n");
+#endif
     PlayreadySession::playreadyTask(1, [this, keySystem, customData](PlayreadySession *prSession){
+#if MPPH_PRINT
         printf("MediaPlayerPrivateHelio::generateKeyRequest task\n");
+#endif
         uint8_t *init_data = NULL;
         size_t size = 0;
         rcv_pssh_data(m_pssh, &init_data, &size);
@@ -490,7 +578,9 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::generateKeyRequest(const
         //LockHolder lock(&m_prSessionLock);
         RefPtr<Uint8Array>result = prSession->playreadyGenerateKeyRequest(initUint8Data.get(), customData, destinationURL, errorCode, systemCode);
         if (errorCode) {
+#if MPPH_PRINT
             printf("ERROR playreadyGenerateKeyRequest the key request wasn't properly generated\n");
+#endif
             // void MediaPlayer::keyError(const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode errorCode, unsigned short systemCode)
             m_mediaPlayer->keyError(keySystem, prSession->sessionId(), errorCode, systemCode);
             return;
@@ -502,7 +592,9 @@ MediaPlayer::MediaKeyException MediaPlayerPrivateHelio::generateKeyRequest(const
         // }
 
         URL url(URL(), destinationURL);
+#if MPPH_PRINT
         printf("playready generateKeyRequest result size %u, sessionId: %s\n", result->length(), prSession->sessionId().utf8().data());
+#endif
 
         callOnMainThread([this, keySystem, result, url, prSession]{
             m_mediaPlayer->keyMessage(keySystem, prSession->sessionId(), result->data(), result->length(), url);
@@ -532,7 +624,9 @@ const uint8_t k_playready_system_id[] = { 0x9a, 0x04, 0xf0, 0x79,
 // is found in the source buffer but encryption is not supported.
 // NOTE(estobb200): initData here is the whole raw pssh box with header.
 void MediaPlayerPrivateHelio::sourceBufferDetectedEncryption(uint8_t *systemId, uint8_t *initData, size_t initDataLength) {
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio::sourceBufferDetectedEncryption()\n");
+#endif
     // TODO: Fix playready..
 
     String keySystem;
@@ -580,17 +674,22 @@ void MediaPlayerPrivateHelio::sourceBufferDetectedEncryption(uint8_t *systemId, 
 }
 
 /**
- * a SourceBufferPrivate becomes active after having reported their
- * initSegment back the SourceBuffer. We use active SourceBuffers to trigger
- * that we have metadata.
+ * a SourceBufferPrivate becomes active after having reported it's
+ * initSegment back to the SourceBuffer. We use active SourceBuffers to trigger
+ * that we have metadata. It's only necessary to report during the init
+ * segment since HTMLMediaElement or's with some internal state.
  *
- * TODO: This may eventually mean we removed a source buffer also..
+ *
+ * NOTE: gstreamer doesn't do this.. but AVFoundation does
+ *  HTMLMediaElement sets some internal values, but those values also get
+ *  updated in a handful of other places
  */
 void MediaPlayerPrivateHelio::mediaSourcePrivateActiveSourceBuffersChanged() {
     m_mediaPlayer->client().mediaPlayerActiveSourceBuffersChanged(m_mediaPlayer);
+
     setReadyState(MediaPlayer::HaveMetadata);
 
-    // TODO: Fix this and point it somewhere more appropriate..
+    // TODO: Fix this and put it somewhere more appropriate..
     m_mediaPlayer->networkStateChanged();
 }
 
@@ -616,7 +715,9 @@ void MediaPlayerPrivateHelio::setReadyState(MediaPlayer::ReadyState stateChange)
     //if (stateChange == MediaPlayer::HaveMetadata && m_readyState < stateChange) {
     //    m_readyState = stateChange;
     //}
+#if MPPH_PRINT
     printf("MediaPlayerPrivateHelio::setReadyState(MediaPlayer::ReadyState stateChange) {\n");
+#endif
     m_readyState = stateChange;
 
     m_mediaPlayer->readyStateChanged();

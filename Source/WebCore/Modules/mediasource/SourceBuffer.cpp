@@ -245,10 +245,10 @@ ExceptionOr<void> SourceBuffer::setAppendWindowEnd(double newValue)
 
 ExceptionOr<void> SourceBuffer::appendBuffer(const BufferSource& data)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    uint64_t now = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
-    printf("SourceBuffer::appendBuffer(%p) @ %llu\n", this, now);
+    // struct timeval tv;
+    // gettimeofday(&tv, NULL);
+    // uint64_t now = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    // printf("SourceBuffer::appendBuffer(%p) @ %llu\n", this, now);
     return appendBufferInternal(static_cast<const unsigned char*>(data.data()), data.length());
 }
 
@@ -503,10 +503,10 @@ void SourceBuffer::scheduleEvent(const AtomicString& eventName)
     auto event = Event::create(eventName, false, false);
     event->setTarget(this);
 
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    uint64_t now = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
-    printf("SourceBuffer::scheduleEvent(%p) %s @ %llu\n", this, eventName.string().utf8().data(), now);
+    // struct timeval tv;
+    // gettimeofday(&tv, NULL);
+    // uint64_t now = (unsigned long long)(tv.tv_sec) * 1000 + (unsigned long long)(tv.tv_usec) / 1000;
+    // printf("SourceBuffer::scheduleEvent(%p) %s @ %llu\n", this, eventName.string().utf8().data(), now);
 
     m_asyncEventQueue.enqueueEvent(WTFMove(event));
 }
@@ -1161,7 +1161,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveInitializationSegment(SourceBuff
     // 2. If the initialization segment has no audio, video, or text tracks, then run the append error algorithm
     // with the decode error parameter set to true and abort these steps.
     if (segment.audioTracks.isEmpty() && segment.videoTracks.isEmpty() && segment.textTracks.isEmpty()) {
-        printf("segment.audioTracks.isEmpty() && segment.videoTracks.isEmpty() && segment.textTracks.isEmpty()\n");
+        printf("ERROR segment.audioTracks.isEmpty() && segment.videoTracks.isEmpty() && segment.textTracks.isEmpty()\n");
         appendError(true);
         return;
     }
@@ -2004,9 +2004,9 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
     unsigned enqueuedSamples = 0;
 #endif
 
-    if (!trackBuffer.decodeQueue.empty()) {
-        printf("Pre queue trackBuffer(%s).decodeQueue.empty(): %i \n", trackID.string().utf8().data(), trackBuffer.decodeQueue.empty());
-    }
+    // if (!trackBuffer.decodeQueue.empty()) {
+    //     printf("Pre queue trackBuffer(%s).decodeQueue.empty(): %i \n", trackID.string().utf8().data(), trackBuffer.decodeQueue.empty());
+    // }
     while (!trackBuffer.decodeQueue.empty()) {
         if (!m_private->isReadyForMoreSamples(trackID)) {
             m_private->notifyClientWhenReadyForMoreSamples(trackID);
@@ -2044,7 +2044,7 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
 #endif
     }
 
-    printf("Post queue trackBuffer(%s).decodeQueue.empty(): %i \n", trackID.string().utf8().data(), trackBuffer.decodeQueue.empty());
+    // printf("Post queue trackBuffer(%s).decodeQueue.empty(): %i \n", trackID.string().utf8().data(), trackBuffer.decodeQueue.empty());
 
     LOG(MediaSource, "SourceBuffer::provideMediaData(%p) - Enqueued %u samples", this, enqueuedSamples);
 }

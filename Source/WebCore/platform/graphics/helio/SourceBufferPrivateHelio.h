@@ -65,7 +65,10 @@ public:
 
     void append(const unsigned char*, unsigned) override;
     void abort() override;
+
+    // TODO: who & when calls this?
     void resetParserState() override;
+
     void removedFromMediaSource() override;
 
     // enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
@@ -125,7 +128,9 @@ private:
 
     bool didDetectISOBMFFMediaSegment(rcv_node_t *root);
 
-    WeakPtr<SourceBufferPrivateHelio> createWeakPtr() { return m_weakFactory.createWeakPtr(); }
+    void reportActiveBuffer() const;
+
+    WeakPtr<SourceBufferPrivateHelio> createWeakThis() { return m_weakFactory.createWeakPtr(); }
 
     WeakPtrFactory<SourceBufferPrivateHelio> m_weakFactory;
 
