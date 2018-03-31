@@ -61,6 +61,7 @@ public:
     virtual void stopAskingForMoreSamples(const AtomicString&) { }
     virtual void notifyClientWhenReadyForMoreSamples(const AtomicString&) { }
 
+    // For testing purposes only, not required to override
     virtual Vector<String> enqueuedSamplesForTrackID(const AtomicString&) { return { }; }
 };
 

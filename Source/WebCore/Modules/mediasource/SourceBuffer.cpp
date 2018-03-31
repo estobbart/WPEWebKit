@@ -58,8 +58,12 @@
 #include <runtime/JSLock.h>
 #include <runtime/VM.h>
 #include <wtf/CurrentTime.h>
+#include <wtf/RefCountedLeakCounter.h>
+#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
+
+DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, sourceBufferCounter, ("SourceBuffer"));
 
 static inline bool mediaSourceLogEnabled()
 {
@@ -120,6 +124,9 @@ SourceBuffer::SourceBuffer(Ref<SourceBufferPrivate>&& sourceBufferPrivate, Media
     , m_pendingRemoveEnd(MediaTime::invalidTime())
     , m_removeTimer(*this, &SourceBuffer::removeTimerFired)
 {
+#ifndef NDEBUG
+    sourceBufferCounter.increment();
+#endif
     ASSERT(m_source);
 
     m_private->setClient(this);
@@ -127,6 +134,10 @@ SourceBuffer::SourceBuffer(Ref<SourceBufferPrivate>&& sourceBufferPrivate, Media
 
 SourceBuffer::~SourceBuffer()
 {
+#ifndef NDEBUG
+    sourceBufferCounter.decrement();
+#endif
+    LOG(MediaSource, "SourceBuffer::~SourceBuffer() %p :isRemoved%i", this, isRemoved());
     ASSERT(isRemoved());
 
     m_private->setClient(nullptr);
@@ -473,11 +484,14 @@ MediaTime SourceBuffer::sourceBufferPrivateFastSeekTimeForMediaTime(const MediaT
 
 bool SourceBuffer::hasPendingActivity() const
 {
-    return m_source || m_asyncEventQueue.hasPendingEvents();
+    bool pendingActivity = m_source || m_asyncEventQueue.hasPendingEvents() || ActiveDOMObject::hasPendingActivity();
+    LOG(MediaSource, "SourceBuffer::hasPendingActivity(%p) %i ", this, pendingActivity);
+    return pendingActivity;
 }
 
 void SourceBuffer::stop()
 {
+    m_asyncEventQueue.close();
     m_appendBufferTimer.stop();
     m_removeTimer.stop();
 }
@@ -864,7 +878,7 @@ void SourceBuffer::removeCodedFrames(const MediaTime& start, const MediaTime& en
         if (m_active && currentMediaTime >= start && currentMediaTime < end && m_private->readyState() > MediaPlayer::HaveMetadata)
             m_private->setReadyState(MediaPlayer::HaveMetadata);
     }
-    
+
     updateBufferedFromTrackBuffers();
 
     // 4. If buffer full flag equals true and this object is ready to accept more bytes, then set the buffer full flag to false.
@@ -2093,6 +2107,7 @@ void SourceBuffer::reenqueueMediaForTime(TrackBuffer& trackBuffer, const AtomicS
 
 void SourceBuffer::didDropSample()
 {
+    LOG(MediaSource, "SourceBuffer::didDropSample(%p)", this);
     if (!isRemoved())
         m_source->mediaElement()->incrementDroppedFrameCount();
 }

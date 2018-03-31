@@ -1028,6 +1028,7 @@ void HTMLMediaElement::scheduleEvent(const AtomicString& eventName)
     // Don't set the event target, the event queue will set it in GenericEventQueue::timerFired and setting it here
     // will trigger an ASSERT if this element has been marked for deletion.
 
+    printf("HTMLMediaElement::scheduleEvent(%s)\n", eventName.string().utf8().data());
     m_asyncEventQueue.enqueueEvent(WTFMove(event));
 }
 

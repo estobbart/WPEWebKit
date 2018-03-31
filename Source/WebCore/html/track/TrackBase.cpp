@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -140,7 +140,7 @@ static bool isValidBCP47LanguageTag(const String& languageTag)
     }
     return true;
 }
-    
+
 void TrackBase::setLanguage(const AtomicString& language)
 {
     if (!language.isEmpty() && !isValidBCP47LanguageTag(language)) {
@@ -158,7 +158,7 @@ void TrackBase::setLanguage(const AtomicString& language)
             element->document().addConsoleMessage(MessageSource::Rendering, MessageLevel::Warning, message);
     } else
         m_validBCP47Language = language;
-    
+
     m_language = language;
 }
 
@@ -173,6 +173,11 @@ WTFLogChannel& TrackBase::logChannel() const
     return LogMedia;
 }
 #endif
+
+void TrackBase::setSourceBuffer(SourceBuffer* buffer) {
+    printf("TrackBase::setSourceBuffer = %s", buffer ? "is SourceBuffer\n" : "is nullptr\n");
+    m_sourceBuffer = buffer;
+}
 
 MediaTrackBase::MediaTrackBase(Type type, const AtomicString& id, const AtomicString& label, const AtomicString& language)
     : TrackBase(type, id, label, language)

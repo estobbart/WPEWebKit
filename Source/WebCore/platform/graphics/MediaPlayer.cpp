@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -51,16 +51,25 @@
 #include "MediaStreamPrivate.h"
 #endif
 
+#if PLATFORM(WPE)
+
 #if USE(GSTREAMER)
 #include "MediaPlayerPrivateGStreamer.h"
 #if ENABLE(MEDIA_STREAM) && USE(OPENWEBRTC)
 #include "MediaPlayerPrivateGStreamerOwr.h"
 #endif
 #define PlatformMediaEngineClassName MediaPlayerPrivateGStreamer
+#endif // USE(GSTREAMER)
+
 #if ENABLE(VIDEO) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
+#if USE(VHS)
+#include "MediaPlayerPrivateVHS.h"
+#elif USE(GSTREAMER)
 #include "MediaPlayerPrivateGStreamerMSE.h"
 #endif
-#endif // USE(GSTREAMER)
+#endif
+
+#endif // PLATFORM(WPE)
 
 #if USE(MEDIA_FOUNDATION)
 #include "MediaPlayerPrivateMediaFoundation.h"
@@ -281,9 +290,13 @@ static void buildMediaEnginesVector()
         MediaPlayerPrivateGStreamerOwr::registerMediaEngine(addMediaEngine);
 #endif
 
-#if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
+#if ENABLE(VIDEO) && ENABLE(MEDIA_SOURCE) && ENABLE(VIDEO_TRACK)
+#if USE(VHS)
+    MediaPlayerPrivateVHS::registerMediaEngine(addMediaEngine);
+#elif USE(GSTREAMER)
     if (Settings::isGStreamerEnabled())
         MediaPlayerPrivateGStreamerMSE::registerMediaEngine(addMediaEngine);
+#endif
 #endif
 
     haveMediaEnginesVector() = true;
@@ -359,7 +372,7 @@ static const MediaPlayerFactory* nextMediaEngine(const MediaPlayerFactory* curre
     if (engines.isEmpty())
         return nullptr;
 
-    if (!current) 
+    if (!current)
         return &engines.first();
 
     size_t currentIndex = current - &engines.first();
@@ -491,7 +504,7 @@ const MediaPlayerFactory* MediaPlayer::nextBestMediaEngine(const MediaPlayerFact
 
 void MediaPlayer::loadWithNextMediaEngine(const MediaPlayerFactory* current)
 {
-#if ENABLE(MEDIA_SOURCE) 
+#if ENABLE(MEDIA_SOURCE)
 #define MEDIASOURCE m_mediaSource
 #else
 #define MEDIASOURCE 0
@@ -571,12 +584,12 @@ bool MediaPlayer::canLoadPoster() const
 void MediaPlayer::setPoster(const String& url)
 {
     m_private->setPoster(url);
-}    
+}
 
 void MediaPlayer::cancelLoad()
 {
     m_private->cancelLoad();
-}    
+}
 
 void MediaPlayer::prepareToPlay()
 {
@@ -614,7 +627,7 @@ void MediaPlayer::keyAdded()
     m_private->keyAdded();
 }
 #endif
-    
+
 #if ENABLE(ENCRYPTED_MEDIA)
 void MediaPlayer::cdmInstanceAttached(const CDMInstance& instance)
 {
@@ -726,7 +739,7 @@ PlatformLayer* MediaPlayer::platformLayer() const
 {
     return m_private->platformLayer();
 }
-    
+
 #if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
 void MediaPlayer::setVideoFullscreenLayer(PlatformLayer* layer, WTF::Function<void()>&& completionHandler)
 {
@@ -882,7 +895,7 @@ bool MediaPlayer::didLoadingProgress()
 }
 
 void MediaPlayer::setSize(const IntSize& size)
-{ 
+{
     m_size = size;
     m_private->setSize(size);
 }
@@ -937,7 +950,7 @@ NativeImagePtr MediaPlayer::nativeImageForCurrentTime()
 
 MediaPlayer::SupportsType MediaPlayer::supportsType(const MediaEngineSupportParameters& parameters, const MediaPlayerSupportsTypeClient* client)
 {
-    // 4.8.10.3 MIME types - The canPlayType(type) method must return the empty string if type is a type that the 
+    // 4.8.10.3 MIME types - The canPlayType(type) method must return the empty string if type is a type that the
     // user agent knows it cannot render or is the type "application/octet-stream"
     AtomicString containerType = parameters.type.containerType();
     if (containerType == applicationOctetStream())
@@ -974,7 +987,7 @@ void MediaPlayer::getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& t
         engine.getSupportedTypes(engineTypes);
         types.add(engineTypes.begin(), engineTypes.end());
     }
-} 
+}
 
 bool MediaPlayer::isAvailable()
 {
@@ -1141,7 +1154,7 @@ static void addToHash(HashSet<T>& toHash, HashSet<T>&& fromHash)
     else
         toHash.add(fromHash.begin(), fromHash.end());
 }
-    
+
 HashSet<RefPtr<SecurityOrigin>> MediaPlayer::originsInMediaCache(const String& path)
 {
     HashSet<RefPtr<SecurityOrigin>> origins;
@@ -1427,7 +1440,7 @@ String MediaPlayer::languageOfPrimaryAudioTrack() const
 {
     if (!m_private)
         return emptyString();
-    
+
     return m_private->languageOfPrimaryAudioTrack();
 }
 
@@ -1443,7 +1456,7 @@ unsigned long long MediaPlayer::fileSize() const
 {
     if (!m_private)
         return 0;
-    
+
     return m_private->fileSize();
 }
 

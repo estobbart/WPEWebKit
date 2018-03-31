@@ -42,9 +42,14 @@ class WebProcessMain final: public ChildProcessMainBase {
 public:
     bool platformInitialize() override
     {
-#if ENABLE(DEVELOPER_MODE)
-        if (g_getenv("WEBKIT2_PAUSE_WEB_PROCESS_ON_LAUNCH"))
+// TODO: Fix the DEVELOPER_MODE for WPE
+//#if ENABLE(DEVELOPER_MODE)
+#ifndef NDEBUG
+        if (g_getenv("WEBKIT2_PAUSE_WEB_PROCESS_ON_LAUNCH")) {
+            printf("WEBKIT2_PAUSE_WEB_PROCESS_ON_LAUNCH...  WTF::sleep(30)\n");
             WTF::sleep(30);
+            printf("WEBKIT2_PAUSE_WEB_PROCESS_ON_LAUNCH...  resuming.\n");
+        }
 #endif
 
         return true;

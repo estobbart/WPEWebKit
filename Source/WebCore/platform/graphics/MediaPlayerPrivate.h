@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef MediaPlayerPrivate_h
@@ -54,7 +54,7 @@ public:
     virtual void load(MediaStreamPrivate&) = 0;
 #endif
     virtual void cancelLoad() = 0;
-    
+
     virtual void prepareToPlay() { }
     virtual PlatformMedia platformMedia() const { return NoPlatformMedia; }
     virtual PlatformLayer* platformLayer() const { return 0; }
@@ -74,7 +74,7 @@ public:
     virtual long platformErrorCode() const { return 0; }
 
     virtual void play() = 0;
-    virtual void pause() = 0;    
+    virtual void pause() = 0;
     virtual void setShouldBufferData(bool) { }
 
     virtual bool supportsPictureInPicture() const { return false; }
@@ -121,14 +121,14 @@ public:
 
     virtual void setVolume(float) { }
     virtual void setVolumeDouble(double volume) { return setVolume(volume); }
-#if PLATFORM(IOS) || USE(GSTREAMER)
+#if PLATFORM(IOS) || USE(GSTREAMER) || USE(VHS)
     virtual float volume() const { return 1; }
 #endif
 
     virtual bool supportsMuting() const { return false; }
     virtual void setMuted(bool) { }
 
-    virtual bool hasClosedCaptions() const { return false; }    
+    virtual bool hasClosedCaptions() const { return false; }
     virtual void setClosedCaptionsVisible(bool) { }
 
     virtual double maxFastForwardRate() const { return std::numeric_limits<double>::infinity(); }
